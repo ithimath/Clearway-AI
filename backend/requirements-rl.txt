@@ -1,0 +1,6 @@
+# Optional RL dependencies — install after core requirements.txt
+# These are optional; the app works without them.
+# Install with: pip install -r requirements-rl.txt
+gymnasium==1.0.0
+stable-baselines3==2.4.0
+sb3-contrib==2.4.0

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Database
+*.db
+*.sqlite
+
+# Environment
+.env
+
+# Data generated
+data/processed/
+data/raw/*.csv
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Models (RL)
+backend/models/*.zip
+*.pt
+*.pkl
+
+# Logs
+*.log
