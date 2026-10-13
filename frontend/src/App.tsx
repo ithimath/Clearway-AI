@@ -21,8 +21,11 @@ import type {
   MaintenanceJob 
 } from './types';
 
+import { RefreshCw, AlertTriangle } from 'lucide-react';
+
 const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('corridor');
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(['corridor']));
   const [network, setNetwork] = useState<NetworkResponse | null>(null);
   const [trains, setTrains] = useState<Train[]>([]);
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -30,34 +33,56 @@ const AppContent: React.FC = () => {
   const [simState, setSimState] = useState<SimulationState | null>(null);
   const [metrics, setMetrics] = useState<MetricSummary | null>(null);
   const [maintenanceJobs, setMaintenanceJobs] = useState<MaintenanceJob[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [initialLoadError, setInitialLoadError] = useState<string | null>(null);
   const [isLoadingConflicts, setIsLoadingConflicts] = useState(false);
   const [isOptimizingMaintenance, setIsOptimizingMaintenance] = useState(false);
   const [selectedConflict, setSelectedConflict] = useState<ConflictRecord | null>(null);
 
-  // Initial data loading
+  // Tab switching with lazy rendering & DOM caching
+  const handleSelectTab = useCallback((tab: string) => {
+    setActiveTab(tab);
+    setVisitedTabs((prev) => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+  }, []);
+
+  // Initial data loading (deduplicated, avoiding redundant blocks request)
   const loadInitialData = useCallback(async () => {
+    setIsInitialLoading(true);
+    setInitialLoadError(null);
     try {
-      const [netData, trData, blkData, confData, metricData, jobsData, simData] = await Promise.all([
+      const [netData, trData, confData, metricData, jobsData, simData] = await Promise.all([
         api.getNetwork().catch((e) => { console.error('getNetwork failed:', e); return null; }),
         api.getTrains().catch((e) => { console.error('getTrains failed:', e); return []; }),
-        api.getBlocks().catch((e) => { console.error('getBlocks failed:', e); return []; }),
         api.getConflicts().catch((e) => { console.error('getConflicts failed:', e); return { conflicts: [], count: 0 }; }),
         api.getMetrics().catch((e) => { console.error('getMetrics failed:', e); return null; }),
         api.getMaintenanceJobs().catch((e) => { console.error('getMaintenanceJobs failed:', e); return []; }),
         api.getSimState().catch((e) => { console.error('getSimState failed:', e); return null; }),
       ]);
 
-      if (netData) setNetwork(netData);
-      if (trData) setTrains(trData);
-      if (blkData) setBlocks(blkData);
+      if (netData) {
+        setNetwork(netData);
+        if (netData.blocks) setBlocks(netData.blocks);
+      } else {
+        setInitialLoadError('Unable to load railway network infrastructure. Verify backend is running at http://127.0.0.1:8000.');
+      }
+
+      if (trData && trData.length > 0) setTrains(trData);
       if (confData) {
         setConflicts(Array.isArray(confData) ? confData : (confData.conflicts || []));
       }
       if (metricData) setMetrics(metricData);
       if (jobsData) setMaintenanceJobs(jobsData);
       if (simData) setSimState(simData);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load initial data:', err);
+      setInitialLoadError(err.message || 'Failed to connect to backend server.');
+    } finally {
+      setIsInitialLoading(false);
     }
   }, []);
 
@@ -65,50 +90,73 @@ const AppContent: React.FC = () => {
     loadInitialData();
   }, [loadInitialData]);
 
-  // Simulation Polling loop
+  // Simulation Polling loop (optimized with document.hidden guard & reference equality check)
   useEffect(() => {
+    let isMounted = true;
     const pollInterval = simState?.is_running ? 1000 : 3500;
     const interval = setInterval(async () => {
+      // Pause polling when browser tab is inactive to save CPU and network
+      if (typeof document !== 'undefined' && document.hidden) return;
+
       try {
         const state = await api.getSimState();
-        setSimState(state);
-      } catch (err) {
-        // quiet ignore polling glitch
+        if (!isMounted) return;
+
+        setSimState((prev) => {
+          if (!prev) return state;
+          // Prevent unnecessary re-renders across the entire tree if state did not change
+          if (
+            prev.is_running === state.is_running &&
+            prev.current_time_min === state.current_time_min &&
+            prev.speed_factor === state.speed_factor &&
+            prev.step_count === state.step_count &&
+            JSON.stringify(prev.blocks) === JSON.stringify(state.blocks) &&
+            JSON.stringify(prev.trains) === JSON.stringify(state.trains)
+          ) {
+            return prev;
+          }
+          return state;
+        });
+      } catch {
+        // Quiet ignore polling glitch
       }
     }, pollInterval);
 
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [simState?.is_running]);
 
-  // Simulation handlers
-  const handleStartSim = async () => {
+  // Simulation handlers (memoized with useCallback)
+  const handleStartSim = useCallback(async () => {
     await api.startSim();
     setSimState((prev) => prev ? { ...prev, is_running: true } : null);
-  };
+  }, []);
 
-  const handlePauseSim = async () => {
+  const handlePauseSim = useCallback(async () => {
     await api.pauseSim();
     setSimState((prev) => prev ? { ...prev, is_running: false } : null);
-  };
+  }, []);
 
-  const handleResetSim = async (time: number = 360) => {
+  const handleResetSim = useCallback(async (time: number = 360) => {
     await api.resetSim(time);
     const state = await api.getSimState();
     setSimState(state);
-  };
+  }, []);
 
-  const handleStepSim = async (steps: number = 1) => {
+  const handleStepSim = useCallback(async (steps: number = 1) => {
     const updated = await api.stepSim(steps);
     setSimState(updated);
-  };
+  }, []);
 
-  const handleSetSpeed = async (factor: number) => {
+  const handleSetSpeed = useCallback(async (factor: number) => {
     await api.setSimSpeed(factor);
     setSimState((prev) => prev ? { ...prev, speed_factor: factor } : null);
-  };
+  }, []);
 
   // Conflict scanning
-  const handleRefreshConflicts = async () => {
+  const handleRefreshConflicts = useCallback(async () => {
     setIsLoadingConflicts(true);
     try {
       const res = await api.detectConflicts(true, 'baseline');
@@ -118,32 +166,39 @@ const AppContent: React.FC = () => {
         if (!prev) return null;
         return loaded.find((c: ConflictRecord) => c.conflict_uid === prev.conflict_uid) || null;
       });
-      const [m, tr, blk] = await Promise.all([
+      const [m, tr] = await Promise.all([
         api.getMetrics().catch(() => null),
         api.getTrains().catch(() => []),
-        api.getBlocks().catch(() => []),
       ]);
       if (m) setMetrics(m);
       if (tr.length) setTrains(tr);
-      if (blk.length) setBlocks(blk);
     } catch (err) {
       console.error('Failed to detect conflicts:', err);
     } finally {
       setIsLoadingConflicts(false);
     }
-  };
+  }, []);
 
   // Maintenance handlers
-  const handleScheduleJob = async (job: Partial<MaintenanceJob>) => {
+  const handleScheduleJob = useCallback(async (job: Partial<MaintenanceJob>) => {
     const created = await api.createMaintenanceJob(job);
     setMaintenanceJobs((prev) => [...prev, created]);
-  };
+  }, []);
 
-  const handleRunMaintenanceOptimizer = async () => {
+  const handleRunMaintenanceOptimizer = useCallback(async () => {
     setIsOptimizingMaintenance(true);
     try {
       const res = await api.optimizeMaintenance();
+      let attempts = 0;
+      const maxAttempts = 45; // ~45 second guard
       const pollJob = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts) {
+          clearInterval(pollJob);
+          setIsOptimizingMaintenance(false);
+          return;
+        }
+
         try {
           const status = await api.getJobStatus(res.job_id);
           if (status.status === 'completed') {
@@ -163,13 +218,13 @@ const AppContent: React.FC = () => {
     } catch {
       setIsOptimizingMaintenance(false);
     }
-  };
+  }, []);
 
   return (
     <div className="app-container">
       <Header
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleSelectTab}
         simState={simState}
         onStartSim={handleStartSim}
         onPauseSim={handlePauseSim}
@@ -180,73 +235,123 @@ const AppContent: React.FC = () => {
       />
 
       <main className="main-content">
-        {activeTab === 'corridor' && (
-          <CorridorMap 
-            network={network} 
-            simState={simState} 
-          />
-        )}
-
-        {activeTab === 'stringline' && (
-          <StringlineDiagram
-            network={network}
-            trains={trains}
-            conflicts={conflicts}
-            currentTimeMin={simState?.current_time_min ?? 360}
-            selectedConflictId={selectedConflict?.conflict_uid || (selectedConflict?.id ? String(selectedConflict.id) : null)}
-            onSelectConflict={setSelectedConflict}
-          />
-        )}
-
-        {activeTab === 'conflicts' && (
-          <ConflictRadar
-            conflicts={conflicts}
-            onRefreshConflicts={handleRefreshConflicts}
-            onTriggerOptimizer={() => setActiveTab('optimizer')}
-            isLoading={isLoadingConflicts}
-            selectedConflictId={selectedConflict?.conflict_uid || (selectedConflict?.id ? String(selectedConflict.id) : null)}
-            onSelectConflict={setSelectedConflict}
-            onNavigateToStringline={() => setActiveTab('stringline')}
-          />
-        )}
-
-        {activeTab === 'maintenance' && (
-          <MaintenancePlanner
-            jobs={maintenanceJobs}
-            network={network}
-            onScheduleJob={handleScheduleJob}
-            onRunOptimizer={handleRunMaintenanceOptimizer}
-            isLoading={isOptimizingMaintenance}
-          />
-        )}
-
-        {activeTab === 'optimizer' && (
-          <ScheduleOptimizer
-            onOptimizationApplied={async () => {
-              const [tr, conf, m] = await Promise.all([
-                api.getTrains().catch(() => []),
-                api.getConflicts('baseline').catch(() => ({ conflicts: [], count: 0 })),
-                api.getMetrics().catch(() => null),
-              ]);
-              if (tr.length) setTrains(tr);
-              if (conf) setConflicts(Array.isArray(conf) ? conf : (conf.conflicts || []));
-              if (m) setMetrics(m);
+        {/* Connection Error Banner with Retry */}
+        {initialLoadError && (
+          <div 
+            className="glass-panel" 
+            style={{ 
+              padding: '16px 20px', 
+              marginBottom: 20, 
+              border: '1.5px solid var(--accent-rose)', 
+              background: 'var(--accent-rose-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
+              flexWrap: 'wrap'
             }}
-          />
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <AlertTriangle size={20} color="var(--accent-rose)" />
+              <div>
+                <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>Server Connection Issue</strong>
+                <p style={{ margin: '2px 0 0', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{initialLoadError}</p>
+              </div>
+            </div>
+            <button 
+              className="btn btn-primary" 
+              onClick={loadInitialData}
+              disabled={isInitialLoading}
+              style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+            >
+              <RefreshCw size={14} className={isInitialLoading ? 'pulse-active' : ''} />
+              <span>{isInitialLoading ? 'Connecting…' : 'Retry Connection'}</span>
+            </button>
+          </div>
         )}
 
-        {activeTab === 'sandbox' && (
-          <ScenarioSandbox
-            trains={trains}
-            blocks={blocks}
-            onScenarioRan={handleRefreshConflicts}
-          />
+        {/* Tab views with lazy-mounting and persistent cached DOM */}
+        {visitedTabs.has('corridor') && (
+          <div style={{ display: activeTab === 'corridor' ? 'block' : 'none' }}>
+            <CorridorMap 
+              network={network} 
+              simState={simState} 
+            />
+          </div>
         )}
 
-        {activeTab === 'analytics' && (
-          <AnalyticsView
-            metrics={metrics}
-          />
+        {visitedTabs.has('stringline') && (
+          <div style={{ display: activeTab === 'stringline' ? 'block' : 'none' }}>
+            <StringlineDiagram
+              network={network}
+              trains={trains}
+              conflicts={conflicts}
+              currentTimeMin={simState?.current_time_min ?? 360}
+              selectedConflictId={selectedConflict?.conflict_uid || (selectedConflict?.id ? String(selectedConflict.id) : null)}
+              onSelectConflict={setSelectedConflict}
+            />
+          </div>
+        )}
+
+        {visitedTabs.has('conflicts') && (
+          <div style={{ display: activeTab === 'conflicts' ? 'block' : 'none' }}>
+            <ConflictRadar
+              conflicts={conflicts}
+              onRefreshConflicts={handleRefreshConflicts}
+              onTriggerOptimizer={() => handleSelectTab('optimizer')}
+              isLoading={isLoadingConflicts}
+              selectedConflictId={selectedConflict?.conflict_uid || (selectedConflict?.id ? String(selectedConflict.id) : null)}
+              onSelectConflict={setSelectedConflict}
+              onNavigateToStringline={() => handleSelectTab('stringline')}
+            />
+          </div>
+        )}
+
+        {visitedTabs.has('maintenance') && (
+          <div style={{ display: activeTab === 'maintenance' ? 'block' : 'none' }}>
+            <MaintenancePlanner
+              jobs={maintenanceJobs}
+              network={network}
+              onScheduleJob={handleScheduleJob}
+              onRunOptimizer={handleRunMaintenanceOptimizer}
+              isLoading={isOptimizingMaintenance}
+            />
+          </div>
+        )}
+
+        {visitedTabs.has('optimizer') && (
+          <div style={{ display: activeTab === 'optimizer' ? 'block' : 'none' }}>
+            <ScheduleOptimizer
+              onOptimizationApplied={async () => {
+                const [tr, conf, m] = await Promise.all([
+                  api.getTrains().catch(() => []),
+                  api.getConflicts('baseline').catch(() => ({ conflicts: [], count: 0 })),
+                  api.getMetrics().catch(() => null),
+                ]);
+                if (tr.length) setTrains(tr);
+                if (conf) setConflicts(Array.isArray(conf) ? conf : (conf.conflicts || []));
+                if (m) setMetrics(m);
+              }}
+            />
+          </div>
+        )}
+
+        {visitedTabs.has('sandbox') && (
+          <div style={{ display: activeTab === 'sandbox' ? 'block' : 'none' }}>
+            <ScenarioSandbox
+              trains={trains}
+              blocks={blocks}
+              onScenarioRan={handleRefreshConflicts}
+            />
+          </div>
+        )}
+
+        {visitedTabs.has('analytics') && (
+          <div style={{ display: activeTab === 'analytics' ? 'block' : 'none' }}>
+            <AnalyticsView
+              metrics={metrics}
+            />
+          </div>
         )}
       </main>
 

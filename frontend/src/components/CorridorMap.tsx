@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { 
   NetworkResponse, 
   SimulationState
@@ -12,7 +12,7 @@ interface CorridorMapProps {
   onInspectBlock?: (blockCode: string) => void;
 }
 
-export const CorridorMap: React.FC<CorridorMapProps> = ({
+const CorridorMapComponent: React.FC<CorridorMapProps> = ({
   network,
   simState,
   onInspectTrain,
@@ -23,28 +23,47 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
     data: any;
   } | null>(null);
 
-  if (!network) {
-    return (
-      <div className="glass-panel" style={{ padding: 48, textAlign: 'center' }}>
-        <p style={{ color: 'var(--text-secondary)' }}>Loading network corridor infrastructure…</p>
-      </div>
-    );
-  }
-
-  const { stations, blocks } = network;
+  const stations = network?.stations || [];
+  const blocks = network?.blocks || [];
   const simBlocks = simState?.blocks || {};
   const simTrains = simState?.trains || {};
 
   // Sort stations geographically along the corridor (Chennai to Madurai)
-  const sortedStations = [...stations].sort((a, b) => b.lat - a.lat);
+  const sortedStations = useMemo(() => {
+    return [...stations].sort((a, b) => b.lat - a.lat);
+  }, [stations]);
 
-  // Group blocks by section
+  // Pre-index blocks by section pair for fast O(1) lookup
+  const sectionBlocksMap = useMemo(() => {
+    const map = new Map<string, typeof blocks>();
+    blocks.forEach((b) => {
+      const k1 = `${b.section_from}->${b.section_to}`;
+      const k2 = `${b.section_to}->${b.section_from}`;
+      if (!map.has(k1)) map.set(k1, []);
+      if (!map.has(k2)) map.set(k2, []);
+      map.get(k1)!.push(b);
+      map.get(k2)!.push(b);
+    });
+    map.forEach((blks) => blks.sort((a, b) => a.block_index - b.block_index));
+    return map;
+  }, [blocks]);
+
+  // Pre-index dwelling trains by station code for fast O(1) lookup
+  const dwellingTrainsByStation = useMemo(() => {
+    const map = new Map<string, any[]>();
+    Object.values(simTrains).forEach((tr: any) => {
+      if (tr.status !== 'at_station') return;
+      const stCode = tr.current_station_code || (tr.current_stop_idx === 0 ? 'MS' : null);
+      if (stCode) {
+        if (!map.has(stCode)) map.set(stCode, []);
+        map.get(stCode)!.push(tr);
+      }
+    });
+    return map;
+  }, [simTrains]);
+
   const getSectionBlocks = (fromCode: string, toCode: string) => {
-    return blocks.filter(
-      (b) =>
-        (b.section_from === fromCode && b.section_to === toCode) ||
-        (b.section_from === toCode && b.section_to === fromCode)
-    ).sort((a, b) => a.block_index - b.block_index);
+    return sectionBlocksMap.get(`${fromCode}->${toCode}`) || [];
   };
 
   const getBlockColor = (code: string) => {
@@ -59,6 +78,14 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
       default: return 'var(--accent-emerald)';
     }
   };
+
+  if (!network) {
+    return (
+      <div className="glass-panel" style={{ padding: 48, textAlign: 'center' }}>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading network corridor infrastructure…</p>
+      </div>
+    );
+  }
 
 
   return (
@@ -109,15 +136,8 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                 ? getSectionBlocks(station.code, nextStation.code)
                 : [];
 
-              // Active trains dwelling SPECIFICALLY at this station
-              const dwellingTrains = Object.values(simTrains).filter((tr: any) => {
-                if (tr.status !== 'at_station') return false;
-                if (tr.current_station_code) {
-                  return tr.current_station_code === station.code;
-                }
-                // fallback if station not yet tagged
-                return tr.current_stop_idx === 0 && station.code === 'MS';
-              });
+              // Active trains dwelling SPECIFICALLY at this station (O(1) indexed)
+              const dwellingTrains = dwellingTrainsByStation.get(station.code) || [];
 
               const isSelected = selectedElement?.type === 'station' && selectedElement.data.code === station.code;
 
@@ -384,3 +404,5 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
     </div>
   );
 };
+
+export const CorridorMap = React.memo(CorridorMapComponent);

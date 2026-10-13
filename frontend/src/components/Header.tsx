@@ -29,7 +29,7 @@ interface HeaderProps {
   conflictCount: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+const HeaderComponent: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   simState,
@@ -244,3 +244,5 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+
+export const Header = React.memo(HeaderComponent);

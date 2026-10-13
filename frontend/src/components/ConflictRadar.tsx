@@ -12,7 +12,7 @@ interface ConflictRadarProps {
   onNavigateToStringline?: () => void;
 }
 
-export const ConflictRadar: React.FC<ConflictRadarProps> = ({
+const ConflictRadarComponent: React.FC<ConflictRadarProps> = ({
   conflicts,
   onRefreshConflicts,
   onTriggerOptimizer,
@@ -635,3 +635,5 @@ export const ConflictRadar: React.FC<ConflictRadarProps> = ({
     </div>
   );
 };
+
+export const ConflictRadar = React.memo(ConflictRadarComponent);

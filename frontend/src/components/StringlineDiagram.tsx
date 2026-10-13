@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import type { NetworkResponse, Train, ConflictRecord } from '../types';
 import { Layers, Clock, AlertTriangle } from 'lucide-react';
 
@@ -16,7 +16,7 @@ type CorridorKey = 'chennai_madurai_main' | 'chennai_delta_chord' | 'all';
 type SpacingMode = 'distance' | 'sequence';
 type TimeWindowKey = 'full' | 'morning' | 'evening';
 
-export const StringlineDiagram: React.FC<StringlineDiagramProps> = ({
+const StringlineDiagramComponent: React.FC<StringlineDiagramProps> = ({
   network,
   trains,
   conflicts,
@@ -127,23 +127,26 @@ export const StringlineDiagram: React.FC<StringlineDiagramProps> = ({
   const chartWidth = width - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
 
-  const timeToX = (t: number) => {
+  const timeToX = useCallback((t: number) => {
     const clamped = Math.max(timeStart, Math.min(timeEnd, t));
     return paddingLeft + ((clamped - timeStart) / (timeEnd - timeStart)) * chartWidth;
-  };
+  }, [timeStart, timeEnd, chartWidth, paddingLeft]);
 
-  const stationToY = (stationCode: string) => {
-    const idx = stationsWithDistance.findIndex((item) => item.station.code === stationCode);
-    if (idx === -1) return null;
+  // Fast O(1) station-to-Y mapping
+  const stationYMap = useMemo(() => {
+    const map = new Map<string, number>();
+    stationsWithDistance.forEach((item, idx) => {
+      const y = spacingMode === 'sequence' || stationsWithDistance.length <= 1
+        ? paddingTop + (idx / Math.max(stationsWithDistance.length - 1, 1)) * chartHeight
+        : paddingTop + (item.cumDistanceKm / totalCorridorDistance) * chartHeight;
+      map.set(item.station.code, y);
+    });
+    return map;
+  }, [stationsWithDistance, spacingMode, totalCorridorDistance, chartHeight, paddingTop]);
 
-    if (spacingMode === 'sequence' || stationsWithDistance.length <= 1) {
-      return paddingTop + (idx / Math.max(stationsWithDistance.length - 1, 1)) * chartHeight;
-    }
-
-    // Distance-scaled
-    const item = stationsWithDistance[idx];
-    return paddingTop + (item.cumDistanceKm / totalCorridorDistance) * chartHeight;
-  };
+  const stationToY = useCallback((stationCode: string) => {
+    return stationYMap.get(stationCode) ?? null;
+  }, [stationYMap]);
 
   const formatMin = (m: number) => {
     const h = Math.floor(m / 60) % 24;
@@ -151,121 +154,132 @@ export const StringlineDiagram: React.FC<StringlineDiagramProps> = ({
     return `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
   };
 
-  // Time ticks: every 30 mins
-  const timeTicks: number[] = [];
-  for (let t = timeStart; t <= timeEnd; t += 30) {
-    timeTicks.push(t);
-  }
+  // Time ticks: every 30 mins (memoized)
+  const timeTicks = useMemo(() => {
+    const ticks: number[] = [];
+    for (let t = timeStart; t <= timeEnd; t += 30) {
+      ticks.push(t);
+    }
+    return ticks;
+  }, [timeStart, timeEnd]);
 
-  // Active corridor station code set
-  const corridorStationCodes = new Set(corridorStations.map((s) => s.code));
+  // Active corridor station code set (memoized)
+  const corridorStationCodes = useMemo(() => new Set(corridorStations.map((s) => s.code)), [corridorStations]);
 
-  // Determine trains on this corridor
-  const trainTrajectories = trains
-    .map((tr) => {
-      const stops = tr.stops || [];
-      if (stops.length < 2) return null;
-
-      // Filter to stops on this corridor in route order
-      const matchedStops = stops.filter((st) => st.station_code && corridorStationCodes.has(st.station_code));
-      if (matchedStops.length < 2) return null;
-
-      const points: { x: number; y: number; time: number; type: 'arr' | 'dep'; station: string }[] = [];
-
-      for (const st of matchedStops) {
-        const y = stationToY(st.station_code!);
-        if (y === null) continue;
-
-        const arr = st.revised_arrival_min ?? st.planned_arrival_min ?? st.planned_departure_min;
-        const dep = st.revised_departure_min ?? st.planned_departure_min ?? st.planned_arrival_min;
-
-        if (arr !== null && arr !== undefined) {
-          points.push({ x: timeToX(arr), y, time: arr, type: 'arr', station: st.station_code! });
-        }
-        if (dep !== null && dep !== undefined && dep !== arr) {
-          points.push({ x: timeToX(dep), y, time: dep, type: 'dep', station: st.station_code! });
-        }
+  // Pre-indexed trains involved in the selected conflict (O(1) lookup)
+  const selectedConflictTrains = useMemo(() => {
+    if (!selectedConflictId) return new Set<string>();
+    const set = new Set<string>();
+    conflicts.forEach((c) => {
+      if (c.conflict_uid === selectedConflictId || String(c.id) === selectedConflictId) {
+        if (c.trains) c.trains.forEach((t) => set.add(t));
+        if (c.train_1_number) set.add(c.train_1_number);
+        if (c.train_2_number) set.add(c.train_2_number);
       }
+    });
+    return set;
+  }, [selectedConflictId, conflicts]);
 
-      if (points.length < 2) return null;
+  // Determine trains on this corridor (memoized to prevent recalculation on sim ticks)
+  const trainTrajectories = useMemo(() => {
+    return trains
+      .map((tr) => {
+        const stops = tr.stops || [];
+        if (stops.length < 2) return null;
 
-      // Build continuous SVG path
-      const pathData = points.reduce((acc, pt, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`, '');
+        // Filter to stops on this corridor in route order
+        const matchedStops = stops.filter((st) => st.station_code && corridorStationCodes.has(st.station_code));
+        if (matchedStops.length < 2) return null;
 
-      const isUp = tr.direction === 'up';
+        const points: { x: number; y: number; time: number; type: 'arr' | 'dep'; station: string }[] = [];
 
-      // Check if train is involved in the selected conflict
-      const isConflicted = selectedConflictId
-        ? conflicts.some(
-            (c) =>
-              (c.conflict_uid === selectedConflictId || String(c.id) === selectedConflictId) &&
-              ((c.trains && c.trains.includes(tr.train_number)) ||
-                c.train_1_number === tr.train_number ||
-                c.train_2_number === tr.train_number)
-          )
-        : false;
+        for (const st of matchedStops) {
+          const y = stationToY(st.station_code!);
+          if (y === null) continue;
 
-      return {
-        train: tr,
-        points,
-        pathData,
-        isUp,
-        isConflicted,
-        firstPoint: points[0],
-        lastPoint: points[points.length - 1],
-      };
-    })
-    .filter(Boolean);
+          const arr = st.revised_arrival_min ?? st.planned_arrival_min ?? st.planned_departure_min;
+          const dep = st.revised_departure_min ?? st.planned_departure_min ?? st.planned_arrival_min;
 
-  // Position conflict markers on the chart
-  const conflictMarkers = conflicts
-    .map((c) => {
-      const time = c.interval_start_min ?? c.start_time_min;
-      if (time === undefined || time === null) return null;
-      if (time < timeStart || time > timeEnd) return null;
-
-      const x = timeToX(time);
-      let y: number | null = null;
-
-      // 1. If station conflict
-      if (c.station_code && corridorStationCodes.has(c.station_code)) {
-        y = stationToY(c.station_code);
-      }
-      // 2. If block conflict, determine section
-      else if (c.block_code || c.resource_code) {
-        const code = c.block_code || c.resource_code || '';
-        const clean = code.replace('-REV', '');
-        const parts = clean.includes('_') ? clean.split('_') : clean.split('-');
-        if (parts.length >= 3) {
-          const fromSt = parts[1];
-          const toSt = parts[2];
-          const y1 = stationToY(fromSt);
-          const y2 = stationToY(toSt);
-          if (y1 !== null && y2 !== null) {
-            y = (y1 + y2) / 2; // Midpoint of section
-          } else if (y1 !== null) {
-            y = y1;
-          } else if (y2 !== null) {
-            y = y2;
+          if (arr !== null && arr !== undefined) {
+            points.push({ x: timeToX(arr), y, time: arr, type: 'arr', station: st.station_code! });
+          }
+          if (dep !== null && dep !== undefined && dep !== arr) {
+            points.push({ x: timeToX(dep), y, time: dep, type: 'dep', station: st.station_code! });
           }
         }
-      }
 
-      // If not located on this corridor, skip
-      if (y === null) return null;
+        if (points.length < 2) return null;
 
-      const isSelected = selectedConflictId
-        ? c.conflict_uid === selectedConflictId || String(c.id) === selectedConflictId
-        : false;
+        // Build continuous SVG path
+        const pathData = points.reduce((acc, pt, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`, '');
 
-      return {
-        conflict: c,
-        x,
-        y,
-        isSelected,
-      };
-    })
-    .filter(Boolean);
+        const isUp = tr.direction === 'up';
+        const isConflicted = selectedConflictTrains.has(tr.train_number);
+
+        return {
+          train: tr,
+          points,
+          pathData,
+          isUp,
+          isConflicted,
+          firstPoint: points[0],
+          lastPoint: points[points.length - 1],
+        };
+      })
+      .filter(Boolean);
+  }, [trains, corridorStationCodes, stationToY, timeToX, selectedConflictTrains]);
+
+  // Position conflict markers on the chart (memoized)
+  const conflictMarkers = useMemo(() => {
+    return conflicts
+      .map((c) => {
+        const time = c.interval_start_min ?? c.start_time_min;
+        if (time === undefined || time === null) return null;
+        if (time < timeStart || time > timeEnd) return null;
+
+        const x = timeToX(time);
+        let y: number | null = null;
+
+        // 1. If station conflict
+        if (c.station_code && corridorStationCodes.has(c.station_code)) {
+          y = stationToY(c.station_code);
+        }
+        // 2. If block conflict, determine section
+        else if (c.block_code || c.resource_code) {
+          const code = c.block_code || c.resource_code || '';
+          const clean = code.replace('-REV', '');
+          const parts = clean.includes('_') ? clean.split('_') : clean.split('-');
+          if (parts.length >= 3) {
+            const fromSt = parts[1];
+            const toSt = parts[2];
+            const y1 = stationToY(fromSt);
+            const y2 = stationToY(toSt);
+            if (y1 !== null && y2 !== null) {
+              y = (y1 + y2) / 2; // Midpoint of section
+            } else if (y1 !== null) {
+              y = y1;
+            } else if (y2 !== null) {
+              y = y2;
+            }
+          }
+        }
+
+        // If not located on this corridor, skip
+        if (y === null) return null;
+
+        const isSelected = selectedConflictId
+          ? c.conflict_uid === selectedConflictId || String(c.id) === selectedConflictId
+          : false;
+
+        return {
+          conflict: c,
+          x,
+          y,
+          isSelected,
+        };
+      })
+      .filter(Boolean);
+  }, [conflicts, timeStart, timeEnd, timeToX, corridorStationCodes, stationToY, selectedConflictId]);
 
   const currentX = timeToX(currentTimeMin);
 
@@ -868,3 +882,5 @@ export const StringlineDiagram: React.FC<StringlineDiagramProps> = ({
     </div>
   );
 };
+
+export const StringlineDiagram = React.memo(StringlineDiagramComponent);

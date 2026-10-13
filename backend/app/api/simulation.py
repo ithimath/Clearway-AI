@@ -31,12 +31,14 @@ def _ensure_initialized(db: Session) -> None:
     if simulation_service.is_initialized():
         return
 
+    stations_db = db.query(Station).all()
     stations = [
         {"code": s.code, "name": s.name, "lat": s.lat, "lon": s.lon}
-        for s in db.query(Station).all()
+        for s in stations_db
     ]
+    station_map = {s.id: s.code for s in stations_db}
     sections_raw = db.query(TrackSection).all()
-    station_map = {s.id: s.code for s in db.query(Station).all()}
+    sec_map = {s.id: s for s in sections_raw}
     sections = [
         {
             "from_station_code": station_map.get(s.from_station_id, ""),
@@ -51,18 +53,15 @@ def _ensure_initialized(db: Session) -> None:
     blocks = [
         {
             "code": b.code,
-            "section_from": station_map.get(
-                next((s.from_station_id for s in sections_raw if s.id == b.section_id), None), ""
-            ),
-            "section_to": station_map.get(
-                next((s.to_station_id for s in sections_raw if s.id == b.section_id), None), ""
-            ),
+            "section_from": station_map.get(sec_map[b.section_id].from_station_id, "") if b.section_id in sec_map else "",
+            "section_to": station_map.get(sec_map[b.section_id].to_station_id, "") if b.section_id in sec_map else "",
             "block_index": b.block_index,
             "time_fraction": b.time_fraction,
         }
         for b in blocks_raw
     ]
     trains_raw = db.query(Train).all()
+    train_id_to_num = {t.id: t.train_number for t in trains_raw}
     trains = [
         {
             "train_number": t.train_number,
@@ -75,9 +74,7 @@ def _ensure_initialized(db: Session) -> None:
     stop_times_raw = db.query(StopTime).all()
     stop_times = [
         {
-            "train_number": next(
-                (t.train_number for t in trains_raw if t.id == st.train_id), ""
-            ),
+            "train_number": train_id_to_num.get(st.train_id, ""),
             "station_code": station_map.get(st.station_id, ""),
             "stop_sequence": st.stop_sequence,
             "planned_arrival_min": st.planned_arrival_min,

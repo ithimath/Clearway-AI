@@ -18,6 +18,23 @@ from app.api import (
 logging.basicConfig(level=settings.log_level)
 logger = logging.getLogger(__name__)
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialise DB tables and seed if empty."""
+    logger.info("Starting Clearway AI backend…")
+    init_db()
+    db = SessionLocal()
+    try:
+        from app.services.seed import seed_database
+        seed_database(db)
+    finally:
+        db.close()
+    logger.info("Clearway AI backend ready.")
+    yield
+
+
 app = FastAPI(
     title="Clearway AI — Railway Block Planning & Maintenance Window Optimizer",
     description=(
@@ -26,6 +43,7 @@ app = FastAPI(
         "Do not use to control real trains."
     ),
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -43,17 +61,3 @@ for router_module in [
     scenarios, jobs, rl, data, export,
 ]:
     app.include_router(router_module.router)
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    """Initialise DB tables and seed if empty."""
-    logger.info("Starting Clearway AI backend…")
-    init_db()
-    db = SessionLocal()
-    try:
-        from app.services.seed import seed_database
-        seed_database(db)
-    finally:
-        db.close()
-    logger.info("Clearway AI backend ready.")

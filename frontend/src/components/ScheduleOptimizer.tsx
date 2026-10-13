@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Cpu, Zap, RefreshCw, RotateCcw } from 'lucide-react';
 import { api } from '../api/client';
 
@@ -6,7 +6,7 @@ interface ScheduleOptimizerProps {
   onOptimizationApplied?: () => void;
 }
 
-export const ScheduleOptimizer: React.FC<ScheduleOptimizerProps> = ({
+const ScheduleOptimizerComponent: React.FC<ScheduleOptimizerProps> = ({
   onOptimizationApplied,
 }) => {
   const [isSolving, setIsSolving] = useState(false);
@@ -14,6 +14,15 @@ export const ScheduleOptimizer: React.FC<ScheduleOptimizerProps> = ({
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const pollIntervalRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
 
   const startOptimization = async () => {
     setIsSolving(true);
@@ -22,24 +31,35 @@ export const ScheduleOptimizer: React.FC<ScheduleOptimizerProps> = ({
     try {
       const res = await api.optimizeSchedule({ max_delay_min: 120, time_limit_s: 30 });
 
-      // Poll job status until done
-      const interval = setInterval(async () => {
+      let attempts = 0;
+      const maxAttempts = 45; // ~54 seconds timeout guard
+
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts) {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          setError('Solver operation exceeded maximum wait limit (50s). Please check logs.');
+          setIsSolving(false);
+          return;
+        }
+
         try {
           const status = await api.getJobStatus(res.job_id);
-          setProgress(status.progress ? Math.round(status.progress * 100) : 50);
+          setProgress(status.progress ? Math.round(status.progress * 100) : Math.min(85, attempts * 4));
 
           if (status.status === 'completed') {
-            clearInterval(interval);
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
             setResult(status.result);
             setIsSolving(false);
             onOptimizationApplied?.();
           } else if (status.status === 'failed') {
-            clearInterval(interval);
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
             setError(status.error_message || 'Optimization solver failed');
             setIsSolving(false);
           }
         } catch (err: any) {
-          clearInterval(interval);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           setError(err.message || 'Error checking solver job');
           setIsSolving(false);
         }
@@ -252,3 +272,5 @@ export const ScheduleOptimizer: React.FC<ScheduleOptimizerProps> = ({
     </div>
   );
 };
+
+export const ScheduleOptimizer = React.memo(ScheduleOptimizerComponent);

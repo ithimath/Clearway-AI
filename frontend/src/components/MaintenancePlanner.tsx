@@ -10,7 +10,7 @@ interface MaintenancePlannerProps {
   isLoading?: boolean;
 }
 
-export const MaintenancePlanner: React.FC<MaintenancePlannerProps> = ({
+const MaintenancePlannerComponent: React.FC<MaintenancePlannerProps> = ({
   jobs,
   network,
   onScheduleJob,
@@ -357,3 +357,5 @@ export const MaintenancePlanner: React.FC<MaintenancePlannerProps> = ({
     </div>
   );
 };
+
+export const MaintenancePlanner = React.memo(MaintenancePlannerComponent);

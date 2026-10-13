@@ -1,6 +1,9 @@
-"""Application configuration via environment variables using pydantic-settings."""
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_DEFAULT_DB_PATH = (_BACKEND_DIR / "clearway.db").resolve().as_posix()
 
 
 class Settings(BaseSettings):
@@ -9,7 +12,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Database
-    database_url: str = "sqlite:///./clearway.db"
+    database_url: str = f"sqlite:///{_DEFAULT_DB_PATH}"
 
     # Seeding / reproducibility
     seed_random_seed: int = 42

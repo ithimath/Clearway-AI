@@ -26,75 +26,115 @@ export interface ScenarioRunResult {
   explanation: string;
 }
 
-async function request<T>(endpoint: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
+const inFlightGetRequests = new Map<string, Promise<any>>();
+let networkMemoryCache: NetworkResponse | null = null;
+
+async function request<T>(endpoint: string, options?: RequestInit & { timeoutMs?: number; bypassDedupe?: boolean }): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
-  const timeoutMs = options?.timeoutMs ?? 30000;
+  const method = (options?.method || 'GET').toUpperCase();
+  const timeoutMs = options?.timeoutMs ?? (method === 'GET' ? 12000 : 30000);
+
+  // Return existing in-flight promise for concurrent identical GET requests
+  const isIdempotentGet = method === 'GET' && !options?.bypassDedupe;
+  if (isIdempotentGet && inFlightGetRequests.has(url)) {
+    return inFlightGetRequests.get(url) as Promise<T>;
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-      signal: controller.signal,
-      ...options,
-    });
+  const fetchPromise = (async () => {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+        signal: controller.signal,
+        ...options,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!res.ok) {
-      let errorBody = '';
-      try {
-        errorBody = await res.text();
-      } catch {
-        errorBody = res.statusText;
+      if (!res.ok) {
+        let errorBody = '';
+        try {
+          errorBody = await res.text();
+        } catch {
+          errorBody = res.statusText;
+        }
+
+        if (res.status === 502) {
+          throw new Error(
+            'API 502: Bad Gateway. Clearway AI backend service at 127.0.0.1:8000 is unreachable.'
+          );
+        }
+        if (res.status === 504) {
+          throw new Error('API 504: Gateway Timeout. Server took too long to complete operation.');
+        }
+
+        throw new Error(`API ${res.status}: ${errorBody || res.statusText}`);
       }
 
-      if (res.status === 502) {
-        throw new Error(
-          'API Error 502: Bad Gateway. The backend service at 127.0.0.1:8000 is either offline or restarting.'
-        );
+      return await res.json();
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error(`Request timed out after ${timeoutMs / 1000}s. Please check if the backend is responsive.`);
       }
-      if (res.status === 504) {
-        throw new Error('API Error 504: Gateway Timeout. The operation took longer than the server allowed.');
+      if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+        throw new Error('Unable to connect to Clearway AI backend at http://127.0.0.1:8000. Is the server running?');
       }
-
-      throw new Error(`API Error ${res.status}: ${errorBody || res.statusText}`);
+      throw err;
+    } finally {
+      if (isIdempotentGet) {
+        inFlightGetRequests.delete(url);
+      }
     }
+  })();
 
-    return res.json();
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error(`Request timed out after ${timeoutMs / 1000}s. Please check if backend is responsive.`);
-    }
-    throw err;
+  if (isIdempotentGet) {
+    inFlightGetRequests.set(url, fetchPromise);
   }
+
+  return fetchPromise;
 }
 
 export const api = {
   // Health
-  getHealth: () => request<{ status: string; version: string }>('/health', { timeoutMs: 5000 }),
+  getHealth: () => request<{ status: string; version: string }>('/health', { timeoutMs: 4000 }),
 
-  // Network & Infrastructure
-  getNetwork: () => request<NetworkResponse>('/network'),
-  getTrains: () => request<Train[]>('/trains'),
-  getBlocks: () => request<Block[]>('/blocks'),
+  // Network & Infrastructure (caches static network topology)
+  getNetwork: async (forceRefresh: boolean = false): Promise<NetworkResponse> => {
+    if (!forceRefresh && networkMemoryCache) {
+      return networkMemoryCache;
+    }
+    const data = await request<NetworkResponse>('/network', { timeoutMs: 10000 });
+    networkMemoryCache = data;
+    return data;
+  },
+  getTrains: () => request<Train[]>('/trains', { timeoutMs: 10000 }),
+  getBlocks: () => request<Block[]>('/blocks', { timeoutMs: 10000 }),
 
   // Conflicts
   getConflicts: (context: string = 'baseline') =>
-    request<any>(`/conflicts/list?context=${context}`)
-      .catch(() => request<any>(`/conflicts?context=${context}`))
+    request<any>(`/conflicts/list?context=${context}`, { timeoutMs: 12000 })
+      .catch((err) => {
+        // Only fallback to legacy endpoint if 404
+        if (err.message?.includes('404')) {
+          return request<any>(`/conflicts?context=${context}`, { timeoutMs: 12000 });
+        }
+        throw err;
+      })
       .then((res) => (Array.isArray(res) ? { conflicts: res, count: res.length } : res || { conflicts: [], count: 0 })),
   detectConflicts: (useRevised: boolean = false, context: string = 'baseline') =>
     request<{ conflicts: ConflictRecord[]; count: number }>(`/conflicts/detect?use_revised=${useRevised}&context=${context}`, {
       method: 'POST',
+      timeoutMs: 20000,
     }),
 
   // Simulation
-  getSimState: () => request<SimulationState>('/simulation/state', { timeoutMs: 5000 }),
+  getSimState: () => request<SimulationState>('/simulation/state', { timeoutMs: 4000, bypassDedupe: true }),
   startSim: () => request<{ status: string }>('/simulation/start', { method: 'POST' }),
   pauseSim: () => request<{ status: string }>('/simulation/pause', { method: 'POST' }),
   resetSim: (startTimeMin: number = 360) =>

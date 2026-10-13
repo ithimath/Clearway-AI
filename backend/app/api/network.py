@@ -60,12 +60,14 @@ def get_network(db: Session = Depends(get_db)) -> NetworkResponse:
         for sec in sections
     ]
 
+    sec_map = {sec.id: sec for sec in sections}
+
     block_dicts = [
         {
             "id": blk.id,
             "code": blk.code,
-            "section_from": _code_for_section_from(blk, sections, station_map),
-            "section_to": _code_for_section_to(blk, sections, station_map),
+            "section_from": station_map.get(sec_map[blk.section_id].from_station_id, "") if blk.section_id in sec_map else "",
+            "section_to": station_map.get(sec_map[blk.section_id].to_station_id, "") if blk.section_id in sec_map else "",
             "block_index": blk.block_index,
             "time_fraction": blk.time_fraction,
             "state": blk.state,
@@ -80,7 +82,7 @@ def get_network(db: Session = Depends(get_db)) -> NetworkResponse:
             "code": jn.code,
             "name": jn.name,
             "station_code": station_map.get(jn.station_id, "") if jn.station_id else "",
-            "section_codes": json.loads(jn.section_ids_json),
+            "section_codes": json.loads(jn.section_ids_json) if jn.section_ids_json else [],
             "provenance": jn.provenance,
         }
         for jn in junctions
@@ -104,20 +106,3 @@ def get_network(db: Session = Depends(get_db)) -> NetworkResponse:
         junctions=junction_dicts,
         passing_loops=loop_dicts,
     )
-
-
-def _sec_by_id(sections: list[TrackSection], sid: int) -> TrackSection | None:
-    for s in sections:
-        if s.id == sid:
-            return s
-    return None
-
-
-def _code_for_section_from(blk: Block, sections: list[TrackSection], station_map: dict) -> str:
-    sec = _sec_by_id(sections, blk.section_id)
-    return station_map.get(sec.from_station_id, "") if sec else ""
-
-
-def _code_for_section_to(blk: Block, sections: list[TrackSection], station_map: dict) -> str:
-    sec = _sec_by_id(sections, blk.section_id)
-    return station_map.get(sec.to_station_id, "") if sec else ""

@@ -18,7 +18,7 @@ interface ScenarioSandboxProps {
   onScenarioRan?: () => void;
 }
 
-export const ScenarioSandbox: React.FC<ScenarioSandboxProps> = ({
+const ScenarioSandboxComponent: React.FC<ScenarioSandboxProps> = ({
   trains,
   blocks,
   onScenarioRan,
@@ -514,3 +514,5 @@ export const ScenarioSandbox: React.FC<ScenarioSandboxProps> = ({
     </div>
   );
 };
+
+export const ScenarioSandbox = React.memo(ScenarioSandboxComponent);

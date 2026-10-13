@@ -50,16 +50,13 @@ def _load_network_data(db: Session) -> tuple[list[dict], list[dict], list[dict],
         }
         for s in sections_raw
     ]
+    sec_map = {s.id: s for s in sections_raw}
     blocks_raw = db.query(Block).all()
     blocks = [
         {
             "code": b.code,
-            "section_from": station_map.get(
-                next((s.from_station_id for s in sections_raw if s.id == b.section_id), None), ""
-            ),
-            "section_to": station_map.get(
-                next((s.to_station_id for s in sections_raw if s.id == b.section_id), None), ""
-            ),
+            "section_from": station_map.get(sec_map[b.section_id].from_station_id, "") if b.section_id in sec_map else "",
+            "section_to": station_map.get(sec_map[b.section_id].to_station_id, "") if b.section_id in sec_map else "",
             "block_index": b.block_index,
             "time_fraction": b.time_fraction,
         }

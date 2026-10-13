@@ -15,7 +15,7 @@ interface AnalyticsViewProps {
   metrics: MetricSummary | null;
 }
 
-export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ metrics }) => {
+const AnalyticsViewComponent: React.FC<AnalyticsViewProps> = ({ metrics }) => {
   const downloadFile = (url: string, filename: string) => {
     const a = document.createElement('a');
     a.href = url;
@@ -231,3 +231,5 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ metrics }) => {
     </div>
   );
 };
+
+export const AnalyticsView = React.memo(AnalyticsViewComponent);
