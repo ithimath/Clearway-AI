@@ -248,6 +248,40 @@ def optimize_schedule(db: Session, weights: dict[str, float]) -> dict[str, Any]:
         post_conflicts = detect_all(trains_dicts, revised_stop_dicts, section_dicts, block_dicts,
                                     closed_blocks=closed_blocks, use_revised=True)
 
+        # Persist post-optimization conflicts in DB so Conflict Radar and dashboard reflect the solved state
+        from app.models.conflicts import ConflictRecord
+        db.query(ConflictRecord).filter(ConflictRecord.context == "baseline").delete()
+        for c in post_conflicts:
+            db.add(ConflictRecord(
+                conflict_uid=c.conflict_uid,
+                conflict_type=c.conflict_type.value,
+                severity=c.severity.value,
+                trains_json=json.dumps(c.trains),
+                resource_code=c.resource_code,
+                interval_start_min=c.interval_start_min,
+                interval_end_min=c.interval_end_min,
+                explanation=c.explanation,
+                rule_source=c.rule_source,
+                suggested_actions_json=json.dumps(c.suggested_actions),
+                context="baseline",
+            ))
+        db.commit()
+
+        # Update simulation service with revised stop times
+        try:
+            from app.services.simulation import simulation_service
+            stations_sim = [
+                {"code": s.code, "name": s.name, "lat": s.lat, "lon": s.lon}
+                for s in db.query(Station).all()
+            ]
+            trains_sim = [
+                {"train_number": t.train_number, "name": t.name, "direction": t.direction, "priority": t.priority}
+                for t in db.query(Train).all()
+            ]
+            simulation_service.initialize(stations_sim, section_dicts, block_dicts, trains_sim, revised_stop_dicts)
+        except Exception:
+            pass
+
         explanation = _build_explanation(status_str, len(trains_raw), len(baseline_conflicts),
                                          len(post_conflicts), float(delay_after), solve_time, weights)
         return {

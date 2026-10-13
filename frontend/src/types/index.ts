@@ -86,6 +86,11 @@ export interface Train {
   priority: number;
   is_active: boolean;
   provenance: string;
+  origin?: string;
+  destination?: string;
+  planned_departure_min?: number | null;
+  planned_arrival_min?: number | null;
+  stop_count?: number;
   stops?: StopTime[];
 }
 
@@ -123,27 +128,43 @@ export interface SimulationState {
   blocks: Record<string, BlockSimState>;
 }
 
-export type ConflictSeverity = 'critical' | 'major' | 'minor';
+export type ConflictSeverity = 'critical' | 'major' | 'minor' | 'high' | 'medium' | 'low';
 export type ConflictType = 
   | 'single_track_head_on' 
+  | 'opposing_movement'
   | 'block_headway' 
+  | 'headway_violation'
   | 'junction_headway' 
+  | 'junction_conflict'
   | 'maintenance_overlap'
-  | 'station_capacity';
+  | 'closure_conflict'
+  | 'reservation_overlap'
+  | 'delay_conflict'
+  | 'station_capacity'
+  | string;
 
 export interface ConflictRecord {
   id?: number;
+  conflict_uid?: string;
   conflict_type: ConflictType;
   severity: ConflictSeverity;
+  trains?: string[];
   block_code: string | null;
   station_code: string | null;
+  resource_code?: string;
   train_1_number: string;
   train_2_number: string;
   start_time_min: number;
   end_time_min: number;
+  interval_start_min?: number;
+  interval_end_min?: number;
   explanation: string;
+  rule_source?: string;
   suggested_action?: string;
+  suggested_actions?: string[];
   provenance: string;
+  context?: string;
+  detected_at?: string;
   is_resolved?: boolean;
 }
 

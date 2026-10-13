@@ -60,6 +60,8 @@ class TrainSimState:
     status: TrainStatus = TrainStatus.WAITING
     # Index into the stop list
     current_stop_idx: int = 0
+    # Current block index within the section's blocks
+    current_block_idx: int = 0
     # Delay accrued so far (minutes)
     delay_min: int = 0
     # Current block code (None if at station or not started)
@@ -150,6 +152,7 @@ class Simulator:
                 direction=meta.get("direction", "up"),
                 priority=meta.get("priority", 5),
                 status=TrainStatus.WAITING,
+                current_block_idx=0,
             )
 
     def start(self) -> None:
@@ -205,11 +208,12 @@ class Simulator:
                 train.status = TrainStatus.AT_STATION
                 train.actual_departure_min = t
                 train.current_stop_idx = 0
+                train.current_block_idx = 0
 
         elif train.status == TrainStatus.AT_STATION:
             stop = stops[train.current_stop_idx]
             dep = stop.get("planned_departure_min")
-            if dep is None:
+            if dep is None or train.current_stop_idx >= len(stops) - 1:
                 # Final station
                 train.status = TrainStatus.ARRIVED
                 train.actual_arrival_min = t
@@ -219,13 +223,7 @@ class Simulator:
                 return
             if t >= dep + train.delay_min:
                 # Start moving to next stop
-                next_idx = train.current_stop_idx + 1
-                if next_idx >= len(stops):
-                    train.status = TrainStatus.ARRIVED
-                    train.actual_arrival_min = t
-                    return
-                next_stop = stops[next_idx]
-                # Compute blocks for this section
+                next_stop = stops[train.current_stop_idx + 1]
                 from_code = stop["station_code"]
                 to_code = next_stop["station_code"]
                 blocks_on_section = self._blocks_for_section(from_code, to_code)
@@ -234,44 +232,87 @@ class Simulator:
                     if self._can_enter_block(first_block, train):
                         self._enter_block(first_block, train, t)
                         train.status = TrainStatus.EN_ROUTE
-                        train.current_stop_idx = next_idx
+                        train.current_block_idx = 0
                     else:
                         train.status = TrainStatus.HELD
+                        train.current_block_idx = 0
                 else:
                     # No block data; jump directly
-                    train.current_stop_idx = next_idx
+                    train.current_stop_idx += 1
+                    train.current_block_idx = 0
                     train.status = TrainStatus.AT_STATION
 
         elif train.status == TrainStatus.EN_ROUTE:
             blk = self._state.blocks.get(train.current_block or "")
             if blk and blk.expected_exit_min is not None and t >= blk.expected_exit_min:
-                self._release_block(blk.code, train.train_number)
-                train.current_block = None
-                train.status = TrainStatus.AT_STATION
+                if train.current_stop_idx + 1 < len(stops):
+                    cur_stop = stops[train.current_stop_idx]
+                    nxt_stop = stops[train.current_stop_idx + 1]
+                    blocks_on_section = self._blocks_for_section(cur_stop["station_code"], nxt_stop["station_code"])
+                else:
+                    blocks_on_section = []
+
+                next_blk_idx = train.current_block_idx + 1
+                if next_blk_idx < len(blocks_on_section):
+                    # Proceed to next block in section
+                    next_block = blocks_on_section[next_blk_idx]
+                    if self._can_enter_block(next_block, train):
+                        self._release_block(blk.code, train.train_number)
+                        train.current_block_idx = next_blk_idx
+                        self._enter_block(next_block, train, t)
+                    else:
+                        # Cannot enter next block, train holds in current block
+                        train.delay_min += 1
+                        blk.expected_exit_min = t + 1
+                else:
+                    # Traversed all blocks in section; arrived at next station
+                    self._release_block(blk.code, train.train_number)
+                    train.current_block = None
+                    train.current_block_idx = 0
+                    train.current_stop_idx += 1
+                    train.status = TrainStatus.AT_STATION
 
         elif train.status == TrainStatus.HELD:
             # Retry entering the block
-            stop = stops[train.current_stop_idx - 1] if train.current_stop_idx > 0 else stops[0]
-            next_stop = stops[train.current_stop_idx]
-            from_code = stop["station_code"]
-            to_code = next_stop["station_code"]
-            blocks_on_section = self._blocks_for_section(from_code, to_code)
-            if blocks_on_section:
-                first_block = blocks_on_section[0]
-                if self._can_enter_block(first_block, train):
-                    train.delay_min += 1  # accumulate hold delay
-                    self._enter_block(first_block, train, t)
-                    train.status = TrainStatus.EN_ROUTE
+            if train.current_stop_idx + 1 < len(stops):
+                cur_stop = stops[train.current_stop_idx]
+                nxt_stop = stops[train.current_stop_idx + 1]
+                blocks_on_section = self._blocks_for_section(cur_stop["station_code"], nxt_stop["station_code"])
             else:
+                blocks_on_section = []
+
+            if blocks_on_section and train.current_block_idx < len(blocks_on_section):
+                target_block = blocks_on_section[train.current_block_idx]
+                if self._can_enter_block(target_block, train):
+                    train.delay_min += 1
+                    self._enter_block(target_block, train, t)
+                    train.status = TrainStatus.EN_ROUTE
+                else:
+                    train.delay_min += 1
+            else:
+                train.current_stop_idx += 1
+                train.current_block_idx = 0
                 train.status = TrainStatus.AT_STATION
 
     def _blocks_for_section(self, from_code: str, to_code: str) -> list[str]:
-        """Return ordered block codes for a section."""
-        result = [
+        """Return ordered block codes for a section in traversal order."""
+        # Forward match
+        forward = [
             code for code, meta in self._blocks_meta.items()
             if meta.get("section_from") == from_code and meta.get("section_to") == to_code
         ]
-        return sorted(result, key=lambda c: self._blocks_meta[c].get("block_index", 0))
+        if forward:
+            return sorted(forward, key=lambda c: self._blocks_meta[c].get("block_index", 0))
+
+        # Reverse match (reverse traversal of physical blocks)
+        reverse = [
+            code for code, meta in self._blocks_meta.items()
+            if meta.get("section_from") == to_code and meta.get("section_to") == from_code
+        ]
+        if reverse:
+            return sorted(reverse, key=lambda c: self._blocks_meta[c].get("block_index", 0), reverse=True)
+
+        return []
 
     def _can_enter_block(self, block_code: str, train: TrainSimState) -> bool:
         """True if the train is allowed to enter the block."""
@@ -326,6 +367,8 @@ class Simulator:
         """Serialisable snapshot of the full state."""
         trains_out = {}
         for tn, tr in self._state.trains.items():
+            stops = self._stop_times.get(tn, [])
+            curr_station = stops[tr.current_stop_idx]["station_code"] if tr.current_stop_idx < len(stops) else ""
             trains_out[tn] = {
                 "train_number": tr.train_number,
                 "name": tr.name,
@@ -333,6 +376,7 @@ class Simulator:
                 "priority": tr.priority,
                 "status": tr.status.value,
                 "current_stop_idx": tr.current_stop_idx,
+                "current_station_code": curr_station,
                 "delay_min": tr.delay_min,
                 "current_block": tr.current_block,
                 "actual_departure_min": tr.actual_departure_min,

@@ -10,27 +10,73 @@ import type {
 
 const API_BASE = '/api';
 
-async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+export interface ScenarioRunResult {
+  scenario_id: number;
+  scenario_type: string;
+  parameters: Record<string, any>;
+  baseline: {
+    conflict_count: number;
+  };
+  disrupted: {
+    conflict_count: number;
+    new_conflicts: number;
+  };
+  conflicts: ConflictRecord[];
+  conflicts_count: number;
+  explanation: string;
+}
+
+async function request<T>(endpoint: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
-  const res = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    ...options,
-  });
+  const timeoutMs = options?.timeoutMs ?? 30000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!res.ok) {
-    const errorBody = await res.text();
-    throw new Error(`API Error ${res.status}: ${errorBody || res.statusText}`);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      signal: controller.signal,
+      ...options,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      let errorBody = '';
+      try {
+        errorBody = await res.text();
+      } catch {
+        errorBody = res.statusText;
+      }
+
+      if (res.status === 502) {
+        throw new Error(
+          'API Error 502: Bad Gateway. The backend service at 127.0.0.1:8000 is either offline or restarting.'
+        );
+      }
+      if (res.status === 504) {
+        throw new Error('API Error 504: Gateway Timeout. The operation took longer than the server allowed.');
+      }
+
+      throw new Error(`API Error ${res.status}: ${errorBody || res.statusText}`);
+    }
+
+    return res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs / 1000}s. Please check if backend is responsive.`);
+    }
+    throw err;
   }
-
-  return res.json();
 }
 
 export const api = {
   // Health
-  getHealth: () => request<{ status: string; version: string }>('/health'),
+  getHealth: () => request<{ status: string; version: string }>('/health', { timeoutMs: 5000 }),
 
   // Network & Infrastructure
   getNetwork: () => request<NetworkResponse>('/network'),
@@ -38,11 +84,17 @@ export const api = {
   getBlocks: () => request<Block[]>('/blocks'),
 
   // Conflicts
-  getConflicts: () => request<{ conflicts: ConflictRecord[]; count: number }>('/conflicts/list'),
-  detectConflicts: () => request<{ conflicts: ConflictRecord[]; count: number }>('/conflicts/detect', { method: 'POST' }),
+  getConflicts: (context: string = 'baseline') =>
+    request<any>(`/conflicts/list?context=${context}`)
+      .catch(() => request<any>(`/conflicts?context=${context}`))
+      .then((res) => (Array.isArray(res) ? { conflicts: res, count: res.length } : res || { conflicts: [], count: 0 })),
+  detectConflicts: (useRevised: boolean = false, context: string = 'baseline') =>
+    request<{ conflicts: ConflictRecord[]; count: number }>(`/conflicts/detect?use_revised=${useRevised}&context=${context}`, {
+      method: 'POST',
+    }),
 
   // Simulation
-  getSimState: () => request<SimulationState>('/simulation/state'),
+  getSimState: () => request<SimulationState>('/simulation/state', { timeoutMs: 5000 }),
   startSim: () => request<{ status: string }>('/simulation/start', { method: 'POST' }),
   pauseSim: () => request<{ status: string }>('/simulation/pause', { method: 'POST' }),
   resetSim: (startTimeMin: number = 360) =>
@@ -90,7 +142,8 @@ export const api = {
   // Jobs
   getJobStatus: (jobId: string) =>
     request<{ id: string; job_type: string; status: string; progress: number; result: any; error_message?: string }>(
-      `/jobs/${jobId}`
+      `/jobs/${jobId}`,
+      { timeoutMs: 10000 }
     ),
 
   // Scenarios
@@ -99,9 +152,21 @@ export const api = {
     request<any>('/scenarios', {
       method: 'POST',
       body: JSON.stringify(data),
+      timeoutMs: 15000,
     }),
   runScenario: (scenarioId: number) =>
-    request<any>(`/scenarios/${scenarioId}/run`, {
+    request<ScenarioRunResult>(`/scenarios/${scenarioId}/run`, {
       method: 'POST',
+      timeoutMs: 25000,
+    }),
+  applyScenario: (scenarioId: number) =>
+    request<{ status: string; active_conflicts: number }>(`/scenarios/${scenarioId}/apply`, {
+      method: 'POST',
+      timeoutMs: 15000,
+    }),
+  resetScenario: () =>
+    request<{ status: string; baseline_conflicts: number }>('/scenarios/reset', {
+      method: 'POST',
+      timeoutMs: 15000,
     }),
 };

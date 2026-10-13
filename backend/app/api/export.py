@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models.conflicts import ConflictRecord
 from app.models.infrastructure import Block, Station, TrackSection
-from app.models.maintenance import MaintenancePlan
+from app.models.maintenance import MaintenanceJob, MaintenancePlan
 from app.models.trains import StopTime, Train
 
 router = APIRouter(prefix="/api/export", tags=["export"])
@@ -86,7 +86,7 @@ def export_conflicts(db: Session = Depends(get_db)) -> StreamingResponse:
 def export_maintenance_plan(db: Session = Depends(get_db)) -> StreamingResponse:
     """Export maintenance plan as CSV. Provenance: DERIVED."""
     plans = db.query(MaintenancePlan).all()
-    job_map = {j.id: j.title for j in db.query(__import__("app.models.maintenance", fromlist=["MaintenanceJob"]).MaintenanceJob).all()}
+    job_map = {j.id: j.title for j in db.query(MaintenanceJob).all()}
     rows = [
         {
             "plan_id": p.id,
@@ -104,3 +104,41 @@ def export_maintenance_plan(db: Session = Depends(get_db)) -> StreamingResponse:
         for p in plans
     ]
     return _csv_response(rows, "maintenance_plan.csv")
+
+
+@router.get("/report")
+def export_academic_report(db: Session = Depends(get_db)) -> StreamingResponse:
+    """Export academic summary report as Markdown. Provenance: DERIVED."""
+    total_trains = db.query(Train).count()
+    total_blocks = db.query(Block).count()
+    total_stations = db.query(Station).count()
+    total_conflicts = db.query(ConflictRecord).count()
+    total_plans = db.query(MaintenancePlan).count()
+
+    content = f"""# Clearway AI — Railway Block Planning & Maintenance Window Optimizer
+## Academic Decision-Support System Report
+
+- **Corridor Model**: Southern Railway Chennai Egmore – Madurai Corridor ({total_stations} stations, {total_blocks} signalling blocks)
+- **Fleet Scale**: {total_trains} express and passenger services
+- **Conflict Status**: {total_conflicts} rule violations detected
+- **Maintenance Allocations**: {total_plans} scheduled track possessions
+
+### 1. Mathematical Formulation
+- Interval decision variables for exclusive track block occupancy: $[entry_i, entry_i + traverse_i)$.
+- No-overlap constraints on single-track lines: `model.AddNoOverlap([intervals])`.
+- Safety headway buffers: $entry_j - entry_i \\ge headway$ for same-direction moves.
+- Objective function: Minimization of weighted total train delays, timetable disruptions, and schedule variance.
+
+### 2. Data Provenance Transparency
+- **ASSUMED**: Station coordinates, safety headways (5 min), block partitions (2 blocks per section).
+- **DERIVED**: Detected rule violations, CP-SAT optimized dispatch timings, maintenance slot allocations.
+- **SIMULATED**: Deterministic minute-by-minute simulation clock execution state.
+
+*Generated autonomously by Clearway AI Decision-Support System.*
+"""
+    return StreamingResponse(
+        io.BytesIO(content.encode()),
+        media_type="text/markdown",
+        headers={"Content-Disposition": "attachment; filename=clearway_academic_report.md"},
+    )
+

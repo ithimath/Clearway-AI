@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import type { MetricSummary } from '../types';
 import { 
   BarChart3, 
@@ -6,23 +6,16 @@ import {
   FileText, 
   ShieldCheck, 
   Database, 
-  History, 
   Layers, 
-  Train
+  Train,
+  Calendar
 } from 'lucide-react';
-import { api } from '../api/client';
 
 interface AnalyticsViewProps {
   metrics: MetricSummary | null;
 }
 
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ metrics }) => {
-  const [events, setEvents] = useState<any[]>([]);
-
-  useEffect(() => {
-    api.getEvents(20).then(setEvents).catch(() => {});
-  }, []);
-
   const downloadFile = (url: string, filename: string) => {
     const a = document.createElement('a');
     a.href = url;
@@ -33,7 +26,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ metrics }) => {
   };
 
   const provenanceTable = [
-    { entity: 'Station Coordinates & Geometry', tag: 'ASSUMED', color: 'provenance-assumed', note: 'Approximated lat/lon along Delhi-Agra corridor' },
+    { entity: 'Station Coordinates & Geometry', tag: 'ASSUMED', color: 'provenance-assumed', note: 'Approximated lat/lon along Southern Railway Chennai-Madurai corridor' },
     { entity: 'Inter-Station Running Times', tag: 'ASSUMED', color: 'provenance-assumed', note: 'Standard Indian Railways sectional running times' },
     { entity: 'Block Section Partitioning', tag: 'ASSUMED', color: 'provenance-assumed', note: 'Fixed 2 automatic signalling blocks per section' },
     { entity: 'Safety Headway Buffers', tag: 'ASSUMED', color: 'provenance-assumed', note: '5 minutes minimum headway margin' },
@@ -47,90 +40,98 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ metrics }) => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* KPI Cards Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-        <div className="glass-panel interactive-card" style={{ padding: 18 }}>
+        <div className="glass-panel interactive-card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fleet Operations</span>
-            <Train size={16} color="#38bdf8" />
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Fleet Operations
+            </span>
+            <Train size={18} color="var(--accent-cyan)" />
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: 8 }}>
-            {metrics?.trains.active ?? 12} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>/ {metrics?.trains.total ?? 12}</span>
+            {metrics?.trains.active ?? 12} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>/ {metrics?.trains.total ?? 12}</span>
           </div>
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: 8 }}>
             <span className="provenance-tag provenance-derived">DERIVED ACTIVE TRAINS</span>
           </div>
         </div>
 
-        <div className="glass-panel interactive-card" style={{ padding: 18 }}>
+        <div className="glass-panel interactive-card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Track Block Capacity</span>
-            <Layers size={16} color="#10b981" />
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Track Block Capacity
+            </span>
+            <Layers size={18} color="var(--accent-emerald)" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#10b981', marginTop: 8 }}>
-            {metrics?.blocks.available ?? 18} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>/ {metrics?.blocks.total ?? 20}</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-emerald)', marginTop: 8 }}>
+            {metrics?.blocks.available ?? 18} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>/ {metrics?.blocks.total ?? 20}</span>
           </div>
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: 8 }}>
             <span className="provenance-tag provenance-assumed">ASSUMED BLOCKS</span>
           </div>
         </div>
 
-        <div className="glass-panel interactive-card" style={{ padding: 18 }}>
+        <div className="glass-panel interactive-card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>On-Time Performance</span>
-            <ShieldCheck size={16} color="#34d399" />
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              On-Time Performance
+            </span>
+            <ShieldCheck size={18} color="var(--accent-emerald)" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#34d399', marginTop: 8 }}>
-            {metrics?.delays.on_time_pct ?? 92.5}%
+          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-emerald)', marginTop: 8 }}>
+            {metrics?.delays.on_time_pct ?? 100.0}%
           </div>
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: 8 }}>
             <span className="provenance-tag provenance-derived">DERIVED KPI</span>
           </div>
         </div>
 
-        <div className="glass-panel interactive-card" style={{ padding: 18 }}>
+        <div className="glass-panel interactive-card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Average Delay</span>
-            <BarChart3 size={16} color="#fbbf24" />
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+              Average Dispatch Delay
+            </span>
+            <BarChart3 size={18} color="var(--accent-amber)" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#fbbf24', marginTop: 8 }}>
-            {metrics?.delays.avg_min ?? 2.4} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>mins</span>
+          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-amber)', marginTop: 8 }}>
+            {metrics?.delays.avg_min ?? 0.0} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>mins</span>
           </div>
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: 8 }}>
             <span className="provenance-tag provenance-derived">DERIVED AVERAGE</span>
           </div>
         </div>
       </div>
 
       {/* Provenance Matrix & Export Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
         {/* Provenance Ledger */}
         <div className="glass-panel" style={{ padding: 22 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <Database size={18} color="#06b6d4" />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 600, margin: 0 }}>
-              Rigorous Data Provenance Ledger
+            <Database size={18} color="var(--accent-cyan)" />
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Data Provenance & Scientific Transparency Matrix
             </h3>
           </div>
-          <p style={{ margin: '0 0 16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            Every data element in Clearway AI is explicitly categorized to uphold scientific integrity between assumed heuristics and derived optimization outputs.
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 16 }}>
+            Every data entity in Clearway AI is classified by source authenticity to ensure research transparency.
           </p>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+            <table style={{ width: '100%', fontSize: '0.82rem' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '8px 10px' }}>Data Entity</th>
-                  <th style={{ padding: '8px 10px' }}>Classification</th>
-                  <th style={{ padding: '8px 10px' }}>Methodology & Source</th>
+                <tr>
+                  <th>Data Entity</th>
+                  <th>Classification</th>
+                  <th>Methodology / Source</th>
                 </tr>
               </thead>
               <tbody>
-                {provenanceTable.map((row, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <td style={{ padding: '9px 10px', fontWeight: 500 }}>{row.entity}</td>
-                    <td style={{ padding: '9px 10px' }}>
+                {provenanceTable.map((row, idx) => (
+                  <tr key={idx}>
+                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{row.entity}</td>
+                    <td>
                       <span className={`provenance-tag ${row.color}`}>{row.tag}</span>
                     </td>
-                    <td style={{ padding: '9px 10px', color: 'var(--text-secondary)' }}>{row.note}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{row.note}</td>
                   </tr>
                 ))}
               </tbody>
@@ -138,84 +139,93 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ metrics }) => {
           </div>
         </div>
 
-        {/* Export & Download Hub */}
-        <div className="glass-panel" style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Download size={18} color="#38bdf8" />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 600, margin: 0 }}>
-              Export Reports
-            </h3>
-          </div>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            Export schedule tables and full academic documentation for publication and evaluation.
-          </p>
+        {/* Export Data Actions */}
+        <div className="glass-panel" style={{ padding: 22, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <Download size={18} color="var(--accent-primary)" />
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Corridor Data Exports
+              </h3>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 18 }}>
+              Download real CSV datasets generated by the backend database and solver engines.
+            </p>
 
-          <button
-            className="btn btn-secondary"
-            style={{ width: '100%', justifyContent: 'flex-start' }}
-            onClick={() => downloadFile('/api/export/timetable', 'clearway_timetable.csv')}
-          >
-            <FileText size={16} color="#38bdf8" />
-            <span>Download Timetable (CSV)</span>
-          </button>
-
-          <button
-            className="btn btn-secondary"
-            style={{ width: '100%', justifyContent: 'flex-start' }}
-            onClick={() => downloadFile('/api/export/report', 'clearway_academic_report.md')}
-          >
-            <FileText size={16} color="#34d399" />
-            <span>Download Full Report (Markdown)</span>
-          </button>
-
-          <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: 12, borderRadius: 8, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-            Includes mathematical formulations, constraint definitions, and complete Delhi–Agra simulation logs.
-          </div>
-        </div>
-      </div>
-
-      {/* System Event Audit Trail */}
-      <div className="glass-panel" style={{ padding: 22 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <History size={18} color="#a855f7" />
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 600, margin: 0 }}>
-            System Audit Trail & Event Stream
-          </h3>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflowY: 'auto' }}>
-          {events.length === 0 ? (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No recent events logged.</p>
-          ) : (
-            events.map((e, idx) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div
-                key={idx}
+                className="interactive-card"
+                onClick={() => downloadFile('/api/export/timetable', 'timetable_export.csv')}
                 style={{
-                  padding: '8px 12px',
-                  borderRadius: 6,
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
-                  fontSize: '0.78rem',
+                  padding: 14,
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--bg-card-subtle)',
+                  border: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: e.level === 'warn' ? '#fbbf24' : '#38bdf8'
-                  }}></span>
-                  <span style={{ fontWeight: 500, color: '#f1f5f9' }}>{e.message}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <FileText size={18} color="var(--accent-cyan)" />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--text-primary)' }}>Export Timetable CSV</div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>12 Train schedules & stop sequences</div>
+                  </div>
                 </div>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-                  {new Date(e.occurred_at).toLocaleTimeString()}
-                </span>
+                <Download size={15} color="var(--text-muted)" />
               </div>
-            ))
-          )}
+
+              <div
+                className="interactive-card"
+                onClick={() => downloadFile('/api/export/conflicts', 'conflicts_export.csv')}
+                style={{
+                  padding: 14,
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--bg-card-subtle)',
+                  border: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <ShieldCheck size={18} color="var(--accent-amber)" />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--text-primary)' }}>Export Conflict Audit CSV</div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Formal safety violation records</div>
+                  </div>
+                </div>
+                <Download size={15} color="var(--text-muted)" />
+              </div>
+
+              <div
+                className="interactive-card"
+                onClick={() => downloadFile('/api/export/maintenance-plan', 'maintenance_plan_export.csv')}
+                style={{
+                  padding: 14,
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--bg-card-subtle)',
+                  border: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Calendar size={18} color="var(--accent-emerald)" />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--text-primary)' }}>Export Maintenance Plan CSV</div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Assigned possession slots & tracks</div>
+                  </div>
+                </div>
+                <Download size={15} color="var(--text-muted)" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

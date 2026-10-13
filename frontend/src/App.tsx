@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import './styles/index.css';
+import { ThemeProvider } from './context/ThemeContext';
 import { Header } from './components/Header';
 import { CorridorMap } from './components/CorridorMap';
 import { StringlineDiagram } from './components/StringlineDiagram';
@@ -20,7 +21,7 @@ import type {
   MaintenanceJob 
 } from './types';
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('corridor');
   const [network, setNetwork] = useState<NetworkResponse | null>(null);
   const [trains, setTrains] = useState<Train[]>([]);
@@ -30,27 +31,31 @@ export const App: React.FC = () => {
   const [metrics, setMetrics] = useState<MetricSummary | null>(null);
   const [maintenanceJobs, setMaintenanceJobs] = useState<MaintenanceJob[]>([]);
   const [isLoadingConflicts, setIsLoadingConflicts] = useState(false);
+  const [isOptimizingMaintenance, setIsOptimizingMaintenance] = useState(false);
+  const [selectedConflict, setSelectedConflict] = useState<ConflictRecord | null>(null);
 
   // Initial data loading
   const loadInitialData = useCallback(async () => {
     try {
       const [netData, trData, blkData, confData, metricData, jobsData, simData] = await Promise.all([
-        api.getNetwork(),
-        api.getTrains(),
-        api.getBlocks(),
-        api.getConflicts(),
-        api.getMetrics(),
-        api.getMaintenanceJobs().catch(() => []),
-        api.getSimState(),
+        api.getNetwork().catch((e) => { console.error('getNetwork failed:', e); return null; }),
+        api.getTrains().catch((e) => { console.error('getTrains failed:', e); return []; }),
+        api.getBlocks().catch((e) => { console.error('getBlocks failed:', e); return []; }),
+        api.getConflicts().catch((e) => { console.error('getConflicts failed:', e); return { conflicts: [], count: 0 }; }),
+        api.getMetrics().catch((e) => { console.error('getMetrics failed:', e); return null; }),
+        api.getMaintenanceJobs().catch((e) => { console.error('getMaintenanceJobs failed:', e); return []; }),
+        api.getSimState().catch((e) => { console.error('getSimState failed:', e); return null; }),
       ]);
 
-      setNetwork(netData);
-      setTrains(trData);
-      setBlocks(blkData);
-      setConflicts(confData.conflicts || []);
-      setMetrics(metricData);
-      setMaintenanceJobs(jobsData || []);
-      setSimState(simData);
+      if (netData) setNetwork(netData);
+      if (trData) setTrains(trData);
+      if (blkData) setBlocks(blkData);
+      if (confData) {
+        setConflicts(Array.isArray(confData) ? confData : (confData.conflicts || []));
+      }
+      if (metricData) setMetrics(metricData);
+      if (jobsData) setMaintenanceJobs(jobsData);
+      if (simData) setSimState(simData);
     } catch (err) {
       console.error('Failed to load initial data:', err);
     }
@@ -106,10 +111,21 @@ export const App: React.FC = () => {
   const handleRefreshConflicts = async () => {
     setIsLoadingConflicts(true);
     try {
-      const res = await api.detectConflicts();
-      setConflicts(res.conflicts || []);
-      const m = await api.getMetrics();
-      setMetrics(m);
+      const res = await api.detectConflicts(true, 'baseline');
+      const loaded = res.conflicts || [];
+      setConflicts(loaded);
+      setSelectedConflict((prev) => {
+        if (!prev) return null;
+        return loaded.find((c: ConflictRecord) => c.conflict_uid === prev.conflict_uid) || null;
+      });
+      const [m, tr, blk] = await Promise.all([
+        api.getMetrics().catch(() => null),
+        api.getTrains().catch(() => []),
+        api.getBlocks().catch(() => []),
+      ]);
+      if (m) setMetrics(m);
+      if (tr.length) setTrains(tr);
+      if (blk.length) setBlocks(blk);
     } catch (err) {
       console.error('Failed to detect conflicts:', err);
     } finally {
@@ -124,24 +140,29 @@ export const App: React.FC = () => {
   };
 
   const handleRunMaintenanceOptimizer = async () => {
-    const res = await api.optimizeMaintenance();
-    // Poll job status
-    const pollJob = setInterval(async () => {
-      try {
-        const status = await api.getJobStatus(res.job_id);
-        if (status.status === 'completed') {
+    setIsOptimizingMaintenance(true);
+    try {
+      const res = await api.optimizeMaintenance();
+      const pollJob = setInterval(async () => {
+        try {
+          const status = await api.getJobStatus(res.job_id);
+          if (status.status === 'completed') {
+            clearInterval(pollJob);
+            const updatedJobs = await api.getMaintenanceJobs();
+            setMaintenanceJobs(updatedJobs);
+            setIsOptimizingMaintenance(false);
+          } else if (status.status === 'failed') {
+            clearInterval(pollJob);
+            setIsOptimizingMaintenance(false);
+          }
+        } catch {
           clearInterval(pollJob);
-          const updatedJobs = await api.getMaintenanceJobs();
-          setMaintenanceJobs(updatedJobs);
-          alert('Maintenance window optimization complete! Slots assigned with 0 conflicts.');
-        } else if (status.status === 'failed') {
-          clearInterval(pollJob);
-          alert(`Maintenance optimizer failed: ${status.error_message}`);
+          setIsOptimizingMaintenance(false);
         }
-      } catch (err) {
-        clearInterval(pollJob);
-      }
-    }, 1000);
+      }, 1000);
+    } catch {
+      setIsOptimizingMaintenance(false);
+    }
   };
 
   return (
@@ -172,6 +193,8 @@ export const App: React.FC = () => {
             trains={trains}
             conflicts={conflicts}
             currentTimeMin={simState?.current_time_min ?? 360}
+            selectedConflictId={selectedConflict?.conflict_uid || (selectedConflict?.id ? String(selectedConflict.id) : null)}
+            onSelectConflict={setSelectedConflict}
           />
         )}
 
@@ -181,6 +204,9 @@ export const App: React.FC = () => {
             onRefreshConflicts={handleRefreshConflicts}
             onTriggerOptimizer={() => setActiveTab('optimizer')}
             isLoading={isLoadingConflicts}
+            selectedConflictId={selectedConflict?.conflict_uid || (selectedConflict?.id ? String(selectedConflict.id) : null)}
+            onSelectConflict={setSelectedConflict}
+            onNavigateToStringline={() => setActiveTab('stringline')}
           />
         )}
 
@@ -190,6 +216,7 @@ export const App: React.FC = () => {
             network={network}
             onScheduleJob={handleScheduleJob}
             onRunOptimizer={handleRunMaintenanceOptimizer}
+            isLoading={isOptimizingMaintenance}
           />
         )}
 
@@ -197,13 +224,13 @@ export const App: React.FC = () => {
           <ScheduleOptimizer
             onOptimizationApplied={async () => {
               const [tr, conf, m] = await Promise.all([
-                api.getTrains(),
-                api.getConflicts(),
-                api.getMetrics(),
+                api.getTrains().catch(() => []),
+                api.getConflicts('baseline').catch(() => ({ conflicts: [], count: 0 })),
+                api.getMetrics().catch(() => null),
               ]);
-              setTrains(tr);
-              setConflicts(conf.conflicts || []);
-              setMetrics(m);
+              if (tr.length) setTrains(tr);
+              if (conf) setConflicts(Array.isArray(conf) ? conf : (conf.conflicts || []));
+              if (m) setMetrics(m);
             }}
           />
         )}
@@ -225,6 +252,14 @@ export const App: React.FC = () => {
 
       <Footer />
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 };
 

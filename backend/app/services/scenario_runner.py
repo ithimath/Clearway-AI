@@ -63,30 +63,32 @@ def run_scenario_service(db: Session, scenario: Scenario) -> dict:
         for s in stops_raw
     ]
 
-    # Apply scenario modifications
+    # Apply scenario modifications (supports simultaneous train delay and block closure)
     closed_blocks: set[str] = set()
     scenario_stops = [dict(s) for s in stop_dicts_base]
+    has_delay = False
 
-    if scenario_type == "delay":
-        train_number = params.get("train_number", "")
-        delay_min = int(params.get("delay_min", 15))
+    train_number = params.get("train_number", "")
+    delay_min = params.get("delay_min", 0)
+    if train_number and train_number != "none" and delay_min:
+        delay_val = int(delay_min)
+        has_delay = True
         for st in scenario_stops:
             if st["train_number"] == train_number:
                 if st["planned_departure_min"] is not None:
-                    st["revised_departure_min"] = st["planned_departure_min"] + delay_min
+                    st["revised_departure_min"] = st["planned_departure_min"] + delay_val
                 if st["planned_arrival_min"] is not None:
-                    st["revised_arrival_min"] = st["planned_arrival_min"] + delay_min
+                    st["revised_arrival_min"] = st["planned_arrival_min"] + delay_val
 
-    elif scenario_type == "closure":
-        block_code = params.get("block_code", "")
-        if block_code:
-            closed_blocks.add(block_code)
+    block_code = params.get("block_code", "")
+    if block_code and block_code != "none":
+        closed_blocks.add(block_code)
+        closed_blocks.add(f"{block_code}-REV")
 
-    elif scenario_type == "extended_runtime":
+    if scenario_type == "extended_runtime":
         from_st = params.get("from_station", "")
         to_st = params.get("to_station", "")
         extra_min = int(params.get("extra_min", 10))
-        # Increase all times at stations after the affected section
         for sd in section_dicts:
             if sd["from_station_code"] == from_st and sd["to_station_code"] == to_st:
                 sd["running_time_min"] += extra_min
@@ -95,7 +97,7 @@ def run_scenario_service(db: Session, scenario: Scenario) -> dict:
     baseline_conflicts = detect_all(trains_dicts, stop_dicts_base, section_dicts, block_dicts, context="baseline")
 
     # Run scenario conflicts
-    use_rev = scenario_type == "delay"
+    use_rev = has_delay or scenario_type == "delay"
     scenario_conflicts = detect_all(
         trains_dicts, scenario_stops, section_dicts, block_dicts,
         closed_blocks=closed_blocks, use_revised=use_rev, context=context,
@@ -118,6 +120,29 @@ def run_scenario_service(db: Session, scenario: Scenario) -> dict:
             context=context,
         ))
 
+    formatted_conflicts = [
+        {
+            "conflict_uid": c.conflict_uid,
+            "conflict_type": c.conflict_type.value,
+            "severity": c.severity.value,
+            "trains": c.trains,
+            "train_1_number": c.trains[0] if c.trains else "",
+            "train_2_number": c.trains[1] if len(c.trains) > 1 else "",
+            "resource_code": c.resource_code,
+            "block_code": c.resource_code if (c.resource_code.startswith("BLK") or c.resource_code.startswith("SEC")) else None,
+            "station_code": c.resource_code if not (c.resource_code.startswith("BLK") or c.resource_code.startswith("SEC")) else None,
+            "interval_start_min": c.interval_start_min,
+            "interval_end_min": c.interval_end_min,
+            "start_time_min": c.interval_start_min,
+            "end_time_min": c.interval_end_min,
+            "explanation": c.explanation,
+            "rule_source": c.rule_source,
+            "suggested_actions": c.suggested_actions,
+            "suggested_action": c.suggested_actions[0] if c.suggested_actions else "",
+        }
+        for c in scenario_conflicts
+    ]
+
     # Build comparison result
     comparison = {
         "scenario_id": scenario.id,
@@ -128,8 +153,10 @@ def run_scenario_service(db: Session, scenario: Scenario) -> dict:
         },
         "disrupted": {
             "conflict_count": len(scenario_conflicts),
-            "new_conflicts": len(scenario_conflicts) - len(baseline_conflicts),
+            "new_conflicts": max(0, len(scenario_conflicts) - len(baseline_conflicts)),
         },
+        "conflicts": formatted_conflicts,
+        "conflicts_count": len(scenario_conflicts),
         "explanation": (
             f"Scenario '{scenario.name}' ({scenario_type}) applied. "
             f"Baseline conflicts: {len(baseline_conflicts)}. "
@@ -152,3 +179,89 @@ def run_scenario_service(db: Session, scenario: Scenario) -> dict:
     db.add(ev)
     db.commit()
     return comparison
+
+
+def apply_scenario_service(db: Session, scenario: Scenario) -> dict:
+    """Apply the scenario perturbations directly to the active live database timetable and blocks."""
+    params = json.loads(scenario.parameters_json)
+    train_number = params.get("train_number")
+    delay_min = params.get("delay_min")
+    block_code = params.get("block_code")
+
+    affected_trains = 0
+    if train_number and train_number != "none" and delay_min:
+        delay_val = int(delay_min)
+        train = db.query(Train).filter(Train.train_number == train_number).first()
+        if train:
+            stops = db.query(StopTime).filter(StopTime.train_id == train.id).all()
+            for st in stops:
+                if st.planned_departure_min is not None:
+                    st.revised_departure_min = st.planned_departure_min + delay_val
+                if st.planned_arrival_min is not None:
+                    st.revised_arrival_min = st.planned_arrival_min + delay_val
+            affected_trains = len(stops)
+
+    affected_blocks = 0
+    if block_code and block_code != "none":
+        blk = db.query(Block).filter(Block.code == block_code).first()
+        if blk:
+            blk.state = "closed"
+            affected_blocks += 1
+        from app.services.simulation import simulation_service
+        simulation_service.close_block(block_code)
+
+    # Re-detect conflicts and update baseline context so the entire dashboard reflects the scenario
+    from app.api.conflicts import detect_conflicts
+    detect_res = detect_conflicts(use_revised=True, context="baseline", db=db)
+
+    ev = SystemEvent(
+        category="scenario",
+        level="warning",
+        message=f"Scenario {scenario.id} applied to active network: {detect_res.get('count', 0)} active conflicts.",
+        reference_id=str(scenario.id),
+    )
+    db.add(ev)
+    db.commit()
+
+    return {
+        "status": "applied",
+        "scenario_id": scenario.id,
+        "affected_train_stops": affected_trains,
+        "affected_blocks": affected_blocks,
+        "active_conflicts": detect_res.get("count", 0),
+    }
+
+
+def reset_scenario_service(db: Session) -> dict:
+    """Reset all train delays, re-open all blocks, and re-run baseline conflict detection."""
+    # Reset revised stop times
+    stops = db.query(StopTime).all()
+    for st in stops:
+        st.revised_departure_min = None
+        st.revised_arrival_min = None
+
+    # Re-open all blocks
+    blocks = db.query(Block).all()
+    for blk in blocks:
+        blk.state = "available"
+
+    from app.services.simulation import simulation_service
+    for blk in blocks:
+        simulation_service.open_block(blk.code)
+
+    from app.api.conflicts import detect_conflicts
+    detect_res = detect_conflicts(use_revised=False, context="baseline", db=db)
+
+    ev = SystemEvent(
+        category="scenario",
+        level="info",
+        message="Active scenario reset. Network restored to baseline timetable.",
+    )
+    db.add(ev)
+    db.commit()
+
+    return {
+        "status": "reset",
+        "message": "Network restored to baseline timetable. All blocks available.",
+        "baseline_conflicts": detect_res.get("count", 0),
+    }

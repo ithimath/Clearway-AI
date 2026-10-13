@@ -1,7 +1,8 @@
 """Synthetic railway network generator.
 
-Produces a deterministic Delhi–Agra corridor with 10 stations, derived blocks,
-one junction, and one passing loop.  All derived infrastructure is tagged ASSUMED.
+Produces a deterministic Southern Railway corridor (Tamil Nadu: Chennai Egmore – Madurai)
+with 10 stations, derived blocks, junctions, and passing loops.
+All derived infrastructure is tagged ASSUMED.
 
 Units: times in minutes from midnight, distances in km.
 """
@@ -92,47 +93,48 @@ class SyntheticNetwork:
 # Corridor definition (ASSUMED data, deterministic)
 # ---------------------------------------------------------------------------
 
-# 10 stations on a simplified Delhi–Agra corridor
+# 10 stations on the Southern Railway Tamil Nadu Corridor (Chennai Egmore – Madurai Trunk)
 _STATIONS: list[SyntheticStation] = [
-    SyntheticStation("NDLS", "New Delhi",      28.6139,  77.2090, is_junction=True,      platform_count=16),
-    SyntheticStation("MTJ",  "Mathura Jn",     27.4924,  77.6737, is_junction=True,      has_passing_loop=True, platform_count=6),
-    SyntheticStation("GZB",  "Ghaziabad",      28.6692,  77.4538, platform_count=4),
-    SyntheticStation("ALJN", "Aligarh Jn",     27.8895,  78.0782, has_passing_loop=True, platform_count=4),
-    SyntheticStation("TDL",  "Tundla Jn",      27.2004,  78.2391, is_junction=True,      platform_count=4),
-    SyntheticStation("AGC",  "Agra Cantt",     27.1591,  77.9550, platform_count=8),
-    SyntheticStation("PRYJ", "Prayagraj Jn",   25.4358,  81.8463, is_junction=True,      platform_count=10),
-    SyntheticStation("CNB",  "Kanpur Central", 26.4499,  80.3319, platform_count=10),
-    SyntheticStation("ETP",  "Etawah",         26.7746,  79.0225, has_passing_loop=True, platform_count=3),
-    SyntheticStation("FZDB", "Faizabad",       26.7750,  82.1373, platform_count=3),
+    SyntheticStation("MS",   "Chennai Egmore",       13.0827,  80.2707, is_junction=True,      platform_count=11),
+    SyntheticStation("TBM",  "Tambaram",             12.9249,  80.1278, is_junction=True,      has_passing_loop=True, platform_count=8),
+    SyntheticStation("CGL",  "Chengalpattu Jn",      12.6841,  79.9836, is_junction=True,      has_passing_loop=True, platform_count=6),
+    SyntheticStation("VM",   "Villupuram Jn",        11.9398,  79.4920, is_junction=True,      has_passing_loop=True, platform_count=6),
+    SyntheticStation("TPJ",  "Tiruchirappalli Jn",   10.7905,  78.7047, is_junction=True,      has_passing_loop=True, platform_count=8),
+    SyntheticStation("DG",   "Dindigul Jn",          10.3624,  77.9695, is_junction=True,      has_passing_loop=True, platform_count=5),
+    SyntheticStation("MDU",  "Madurai Jn",            9.9195,  78.1193, is_junction=True,      platform_count=8),
+    SyntheticStation("TJ",   "Thanjavur Jn",         10.7870,  79.1378, is_junction=True,      has_passing_loop=True, platform_count=5),
+    SyntheticStation("SA",   "Salem Jn",             11.6643,  78.1460, is_junction=True,      has_passing_loop=True, platform_count=6),
+    SyntheticStation("KPD",  "Katpadi Jn",           12.9796,  79.1368, is_junction=True,      has_passing_loop=True, platform_count=6),
 ]
 
-# Sections (ordered along the corridor)
+# Sections (ordered along the Southern Railway corridor)
 _SECTIONS: list[SyntheticSection] = [
-    SyntheticSection("NDLS", "GZB",  22, 22.0, is_double_track=True,  headway_min=3),
-    SyntheticSection("GZB",  "ALJN", 90, 90.0, is_double_track=False, headway_min=5),
-    SyntheticSection("ALJN", "TDL",  40, 40.0, is_double_track=False, headway_min=5),
-    SyntheticSection("TDL",  "AGC",  18, 18.0, is_double_track=True,  headway_min=4),
-    SyntheticSection("TDL",  "ETP",  52, 52.0, is_double_track=False, headway_min=5),
-    SyntheticSection("ETP",  "CNB",  83, 83.0, is_double_track=False, headway_min=5),
-    SyntheticSection("CNB",  "PRYJ",120,120.0, is_double_track=True,  headway_min=4),
-    SyntheticSection("AGC",  "MTJ",  40, 40.0, is_double_track=True,  headway_min=4),
-    SyntheticSection("MTJ",  "NDLS", 95, 95.0, is_double_track=True,  headway_min=4),
-    SyntheticSection("PRYJ", "FZDB",155,155.0, is_double_track=False, headway_min=5),
+    SyntheticSection("MS",   "CGL",  55,  55.0, is_double_track=True,  headway_min=3),
+    SyntheticSection("CGL",  "VM",   90,  90.0, is_double_track=False, headway_min=5),  # Single track section
+    SyntheticSection("VM",   "TPJ", 120, 120.0, is_double_track=True,  headway_min=4),
+    SyntheticSection("TPJ",  "MDU", 100, 100.0, is_double_track=True,  headway_min=4),
+    SyntheticSection("TPJ",  "DG",   65,  65.0, is_double_track=False, headway_min=5),
+    SyntheticSection("DG",   "MDU",  45,  45.0, is_double_track=False, headway_min=5),
+    SyntheticSection("MS",   "TJ",  180, 180.0, is_double_track=True,  headway_min=4),
+    SyntheticSection("TJ",   "MDU", 120, 120.0, is_double_track=True,  headway_min=4),
+    SyntheticSection("CGL",  "KPD",  90,  90.0, is_double_track=True,  headway_min=4),
+    SyntheticSection("TPJ",  "SA",  140, 140.0, is_double_track=False, headway_min=5),
 ]
 
 _JUNCTIONS: list[SyntheticJunction] = [
-    SyntheticJunction("JN-NDLS", "New Delhi Junction", "NDLS",
-                      ["NDLS-GZB", "MTJ-NDLS"]),
-    SyntheticJunction("JN-TDL",  "Tundla Junction",   "TDL",
-                      ["ALJN-TDL", "TDL-AGC", "TDL-ETP"]),
-    SyntheticJunction("JN-MTJ",  "Mathura Junction",  "MTJ",
-                      ["AGC-MTJ", "MTJ-NDLS"]),
+    SyntheticJunction("JN-MS",  "Chennai Egmore Junction",  "MS",  ["MS-CGL", "MS-TJ"]),
+    SyntheticJunction("JN-CGL", "Chengalpattu Junction",    "CGL", ["MS-CGL", "CGL-VM", "CGL-KPD"]),
+    SyntheticJunction("JN-VM",  "Villupuram Junction",      "VM",  ["CGL-VM", "VM-TPJ"]),
+    SyntheticJunction("JN-TPJ", "Tiruchirappalli Junction", "TPJ", ["VM-TPJ", "TPJ-MDU", "TPJ-DG", "TPJ-SA"]),
+    SyntheticJunction("JN-MDU", "Madurai Junction",         "MDU", ["TPJ-MDU", "DG-MDU", "TJ-MDU"]),
 ]
 
 _LOOPS: list[SyntheticLoop] = [
-    SyntheticLoop("LP-MTJ",  "MTJ",  capacity_trains=1),
-    SyntheticLoop("LP-ALJN", "ALJN", capacity_trains=1),
-    SyntheticLoop("LP-ETP",  "ETP",  capacity_trains=1),
+    SyntheticLoop("LP-CGL", "CGL", capacity_trains=2),
+    SyntheticLoop("LP-VM",  "VM",  capacity_trains=2),
+    SyntheticLoop("LP-TPJ", "TPJ", capacity_trains=3),
+    SyntheticLoop("LP-DG",  "DG",  capacity_trains=2),
+    SyntheticLoop("LP-TJ",  "TJ",  capacity_trains=2),
 ]
 
 
@@ -167,28 +169,28 @@ def _minutes(h: int, m: int) -> int:
 
 
 def _build_trains() -> list[SyntheticTrain]:
-    """Build a deterministic set of 12 trains on the corridor (ASSUMED)."""
+    """Build a deterministic set of 12 South Indian trains on the corridor (ASSUMED)."""
 
-    # Main up corridor: NDLS → AGC via GZB, ALJN, TDL
-    up_main = ["NDLS", "GZB", "ALJN", "TDL", "AGC"]
-    # Down corridor: AGC → NDLS
+    # Main up corridor: MS → MDU via CGL, VM, TPJ
+    up_main = ["MS", "CGL", "VM", "TPJ", "MDU"]
+    # Down corridor: MDU → MS
     down_main = list(reversed(up_main))
-    # Alternate via MTJ loop
-    up_loop = ["NDLS", "MTJ", "AGC"]
+    # Alternate via Thanjavur delta loop
+    up_loop = ["MS", "TJ", "MDU"]
     down_loop = list(reversed(up_loop))
 
     # Running times per section (minutes)
     rt = {
-        ("NDLS", "GZB"):  22, ("GZB", "NDLS"):  22,
-        ("GZB",  "ALJN"): 90, ("ALJN", "GZB"):  90,
-        ("ALJN", "TDL"):  40, ("TDL", "ALJN"):  40,
-        ("TDL",  "AGC"):  18, ("AGC", "TDL"):   18,
-        ("NDLS", "MTJ"):  95, ("MTJ", "NDLS"):  95,
-        ("MTJ",  "AGC"):  40, ("AGC", "MTJ"):   40,
-        ("TDL",  "ETP"):  52, ("ETP", "TDL"):   52,
-        ("ETP",  "CNB"):  83, ("CNB", "ETP"):   83,
-        ("CNB",  "PRYJ"):120, ("PRYJ","CNB"):  120,
-        ("PRYJ", "FZDB"):155, ("FZDB","PRYJ"): 155,
+        ("MS",  "CGL"):  55, ("CGL", "MS"):   55,
+        ("CGL", "VM"):   90, ("VM",  "CGL"):  90,
+        ("VM",  "TPJ"): 120, ("TPJ", "VM"):  120,
+        ("TPJ", "MDU"): 100, ("MDU", "TPJ"): 100,
+        ("MS",  "TJ"):  180, ("TJ",  "MS"):  180,
+        ("TJ",  "MDU"): 120, ("MDU", "TJ"):  120,
+        ("TPJ", "DG"):   65, ("DG",  "TPJ"):  65,
+        ("DG",  "MDU"):  45, ("MDU", "DG"):   45,
+        ("CGL", "KPD"):  90, ("KPD", "CGL"):  90,
+        ("TPJ", "SA"):  140, ("SA",  "TPJ"): 140,
     }
     dwell = 2  # default dwell minutes
 
@@ -209,33 +211,33 @@ def _build_trains() -> list[SyntheticTrain]:
         return stops
 
     trains: list[SyntheticTrain] = [
-        # Express trains (up, high priority)
-        SyntheticTrain("12001", "Shatabdi Exp",       "express",   "up",   1,
+        # Express trains (up, Chennai Egmore → Madurai Jn, high priority)
+        SyntheticTrain("12635", "Vaigai Superfast",       "express",   "up",   1,
                        make_stops(up_main, _minutes(6, 0))),
-        SyntheticTrain("12003", "Gatimaan Exp",       "express",   "up",   1,
+        SyntheticTrain("20605", "Vande Bharat Express",   "express",   "up",   1,
                        make_stops(up_main, _minutes(8, 10))),
-        SyntheticTrain("12005", "Rajdhani Exp",       "express",   "up",   2,
+        SyntheticTrain("12637", "Pandian Superfast",      "express",   "up",   2,
                        make_stops(up_main, _minutes(9, 30))),
-        SyntheticTrain("12007", "Taj Exp",            "express",   "up",   2,
+        SyntheticTrain("16127", "Guruvayur Express",      "express",   "up",   2,
                        make_stops(up_main, _minutes(12, 0))),
         # Passenger trains (up, medium priority)
-        SyntheticTrain("51901", "Delhi Agra Pass",    "passenger", "up",   5,
+        SyntheticTrain("56829", "Tiruchirappalli Pass",   "passenger", "up",   5,
                        make_stops(up_main, _minutes(7, 0))),
-        SyntheticTrain("51903", "Intercity Pass",     "passenger", "up",   5,
+        SyntheticTrain("56705", "Villupuram Madurai Pass","passenger", "up",   5,
                        make_stops(up_main, _minutes(10, 30))),
-        # Loop-route trains (up)
-        SyntheticTrain("14001", "Mathura Loop Exp",   "express",   "up",   3,
+        # Loop-route trains (up via Thanjavur)
+        SyntheticTrain("16187", "Delta Queen Express",    "express",   "up",   3,
                        make_stops(up_loop, _minutes(11, 0))),
-        # Down trains
-        SyntheticTrain("12002", "Shatabdi Dn",        "express",   "down", 1,
+        # Down trains (Madurai Jn → Chennai Egmore)
+        SyntheticTrain("12636", "Vaigai Superfast Dn",    "express",   "down", 1,
                        make_stops(down_main, _minutes(17, 0))),
-        SyntheticTrain("12004", "Gatimaan Dn",        "express",   "down", 1,
+        SyntheticTrain("20606", "Vande Bharat Dn",        "express",   "down", 1,
                        make_stops(down_main, _minutes(15, 30))),
-        SyntheticTrain("12006", "Rajdhani Dn",        "express",   "down", 2,
+        SyntheticTrain("12638", "Pandian Superfast Dn",   "express",   "down", 2,
                        make_stops(down_main, _minutes(18, 0))),
-        SyntheticTrain("51902", "Delhi Agra Pass Dn", "passenger", "down", 5,
+        SyntheticTrain("56830", "Madurai Trichy Pass Dn", "passenger", "down", 5,
                        make_stops(down_main, _minutes(16, 0))),
-        SyntheticTrain("14002", "Mathura Loop Dn",    "express",   "down", 3,
+        SyntheticTrain("16188", "Delta Queen Dn",         "express",   "down", 3,
                        make_stops(down_loop, _minutes(16, 30))),
     ]
     return trains
@@ -246,7 +248,7 @@ def _build_trains() -> list[SyntheticTrain]:
 # ---------------------------------------------------------------------------
 
 def build_synthetic_network(blocks_per_section: int = 2) -> SyntheticNetwork:
-    """Return the full synthetic corridor network.
+    """Return the full synthetic Southern Railway corridor network.
 
     Args:
         blocks_per_section: Number of blocks to derive per section (ASSUMED).

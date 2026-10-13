@@ -75,3 +75,54 @@ def test_metrics_summary():
     assert "trains" in metrics
     assert "blocks" in metrics
     assert "delays" in metrics
+
+
+def test_scenario_execution_workflow():
+    # 1. Create scenario with delay
+    res_create = client.post("/api/scenarios", json={
+        "name": "Integration Test Delay",
+        "delay_train_number": "20606",
+        "delay_minutes": 25,
+    })
+    assert res_create.status_code == 200
+    sc_id = res_create.json()["id"]
+
+    # 2. Run scenario
+    res_run = client.post(f"/api/scenarios/{sc_id}/run")
+    assert res_run.status_code == 200
+    run_data = res_run.json()
+    assert run_data["scenario_id"] == sc_id
+    assert "disrupted" in run_data
+    assert "conflicts" in run_data
+    assert isinstance(run_data["conflicts"], list)
+
+    # 3. Apply scenario
+    res_apply = client.post(f"/api/scenarios/{sc_id}/apply")
+    assert res_apply.status_code == 200
+    assert res_apply.json()["status"] == "applied"
+
+    # 4. Compare scenario
+    res_cmp = client.get(f"/api/scenarios/{sc_id}/compare")
+    assert res_cmp.status_code == 200
+
+    # 5. Reset scenario back to baseline
+    res_reset = client.post("/api/scenarios/reset")
+    assert res_reset.status_code == 200
+    assert res_reset.json()["status"] == "reset"
+
+
+def test_maintenance_endpoints():
+    res_jobs = client.get("/api/maintenance/jobs")
+    assert res_jobs.status_code == 200
+    assert isinstance(res_jobs.json(), list)
+
+    res_add = client.post("/api/maintenance/jobs", json={
+        "job_name": "Test Track Inspection",
+        "block_code": "BLK-CGL-VM-0",
+        "duration_min": 45,
+        "earliest_start_min": 360,
+        "latest_end_min": 600,
+        "priority": 5,
+    })
+    assert res_add.status_code == 200
+    assert res_add.json()["job_name"] == "Test Track Inspection"

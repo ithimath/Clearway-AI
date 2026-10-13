@@ -3,7 +3,7 @@ import type {
   NetworkResponse, 
   SimulationState
 } from '../types';
-import { Train as TrainIcon, Navigation } from 'lucide-react';
+import { Train as TrainIcon, X, Info } from 'lucide-react';
 
 interface CorridorMapProps {
   network: NetworkResponse | null;
@@ -26,7 +26,7 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
   if (!network) {
     return (
       <div className="glass-panel" style={{ padding: 48, textAlign: 'center' }}>
-        <p style={{ color: 'var(--text-secondary)' }}>Loading network corridor data…</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading network corridor infrastructure…</p>
       </div>
     );
   }
@@ -35,7 +35,7 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
   const simBlocks = simState?.blocks || {};
   const simTrains = simState?.trains || {};
 
-  // Sort stations geographically along the corridor (e.g. Delhi to Agra)
+  // Sort stations geographically along the corridor (Chennai to Madurai)
   const sortedStations = [...stations].sort((a, b) => b.lat - a.lat);
 
   // Group blocks by section
@@ -51,58 +51,55 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
     const live = simBlocks[code];
     const state = live ? live.state : 'available';
     switch (state) {
-      case 'occupied': return '#38bdf8'; // Blue
-      case 'reserved': return '#f59e0b'; // Amber
-      case 'closed': return '#ef4444';   // Red
-      case 'conflicted': return '#ec4899'; // Magenta
+      case 'occupied': return 'var(--accent-cyan)';
+      case 'reserved': return 'var(--accent-amber)';
+      case 'closed': return 'var(--accent-rose)';
+      case 'conflicted': return 'var(--accent-rose)';
       case 'available':
-      default: return '#10b981'; // Green
+      default: return 'var(--accent-emerald)';
     }
   };
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Top Controls & Status Legend */}
-      <div className="glass-panel" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      <div className="glass-panel" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div>
-          <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.15rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.2rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>Corridor Schematic & Dynamic Block Visualizer</span>
             <span className="provenance-tag provenance-assumed">ASSUMED BLOCKS (2/SECTION)</span>
           </h2>
-          <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-            Real-time block occupancy, signal reservations, and train progression along Delhi–Agra. Click any block or station for inspector details.
+          <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            Real-time block occupancy, signal reservations, and train progression along Southern Railway (Chennai Egmore – Madurai). Click any block or station for inspector details.
           </p>
         </div>
 
         {/* Legend */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: '#10b981' }}></span>
-            <span>Available</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: '0.76rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--accent-emerald)' }}></span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Available</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: '#38bdf8' }}></span>
-            <span>Occupied</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--accent-cyan)' }}></span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Occupied</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: '#f59e0b' }}></span>
-            <span>Reserved</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--accent-amber)' }}></span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Reserved</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: '#ef4444' }}></span>
-            <span>Maintenance Closed</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: '#ec4899' }}></span>
-            <span>Conflicted</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--accent-rose)' }}></span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Maintenance Closed</span>
           </div>
         </div>
       </div>
 
-      {/* Main Schematic Corridor Canvas / Layout */}
+      {/* Main Schematic Corridor Canvas */}
       <div style={{ display: 'grid', gridTemplateColumns: selectedElement ? '1fr 340px' : '1fr', gap: 20 }}>
-        <div className="glass-panel" style={{ padding: 24, overflowX: 'auto' }}>
-          <div style={{ minWidth: 900, display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <div className="glass-panel" style={{ padding: 24, overflowX: 'auto', background: 'var(--bg-surface)' }}>
+          <div style={{ minWidth: 860, display: 'flex', flexDirection: 'column', gap: 24 }}>
             {sortedStations.map((station, idx) => {
               const isLast = idx === sortedStations.length - 1;
               const nextStation = !isLast ? sortedStations[idx + 1] : null;
@@ -112,57 +109,64 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                 ? getSectionBlocks(station.code, nextStation.code)
                 : [];
 
-              // Active trains currently dwelling at this station
-              const dwellingTrains = Object.values(simTrains).filter(
-                (tr) => tr.status === 'at_station' && !tr.current_block
-              );
+              // Active trains dwelling SPECIFICALLY at this station
+              const dwellingTrains = Object.values(simTrains).filter((tr: any) => {
+                if (tr.status !== 'at_station') return false;
+                if (tr.current_station_code) {
+                  return tr.current_station_code === station.code;
+                }
+                // fallback if station not yet tagged
+                return tr.current_stop_idx === 0 && station.code === 'MS';
+              });
+
+              const isSelected = selectedElement?.type === 'station' && selectedElement.data.code === station.code;
 
               return (
-                <div key={station.code} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div key={station.code} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {/* Station Node Box */}
                   <div 
                     onClick={() => setSelectedElement({ type: 'station', data: station })}
+                    className="interactive-card"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: 12,
-                      padding: '12px 20px',
+                      background: isSelected ? 'var(--bg-surface-elevated)' : 'var(--bg-card)',
+                      border: `1.5px solid ${isSelected ? 'var(--border-bright)' : 'var(--border-subtle)'}`,
+                      borderRadius: 'var(--radius-md)',
+                      padding: '12px 18px',
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      boxShadow: selectedElement?.data?.code === station.code ? '0 0 16px rgba(56, 189, 248, 0.3)' : undefined
+                      boxShadow: isSelected ? 'var(--shadow-glow)' : 'var(--shadow-sm)'
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.4)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)')}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                       <div style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        background: station.is_junction ? '#3b82f6' : '#1e293b',
+                        width: 38,
+                        height: 38,
+                        borderRadius: 'var(--radius-sm)',
+                        background: station.is_junction ? 'linear-gradient(135deg, var(--accent-cyan), var(--accent-primary))' : 'var(--border-subtle)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontWeight: 700,
-                        fontSize: '0.82rem',
-                        color: '#ffffff'
+                        fontSize: '0.84rem',
+                        color: station.is_junction ? '#ffffff' : 'var(--text-primary)',
                       }}>
                         {station.code}
                       </div>
 
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontWeight: 600, fontSize: '0.98rem' }}>{station.name}</span>
+                          <span style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                            {station.name}
+                          </span>
                           {station.is_junction && (
-                            <span style={{ fontSize: '0.68rem', background: 'rgba(59, 130, 246, 0.2)', color: '#93c5fd', padding: '2px 6px', borderRadius: 4 }}>
+                            <span style={{ fontSize: '0.66rem', background: 'var(--accent-cyan-subtle)', color: 'var(--accent-cyan)', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
                               JUNCTION
                             </span>
                           )}
                           {station.has_passing_loop && (
-                            <span style={{ fontSize: '0.68rem', background: 'rgba(16, 185, 129, 0.2)', color: '#6ee7b7', padding: '2px 6px', borderRadius: 4 }}>
+                            <span style={{ fontSize: '0.66rem', background: 'var(--accent-emerald-subtle)', color: 'var(--accent-emerald)', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
                               PASSING LOOP
                             </span>
                           )}
@@ -175,7 +179,7 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
 
                     {/* Dwelling train tags */}
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {dwellingTrains.map((tr) => (
+                      {dwellingTrains.map((tr: any) => (
                         <div
                           key={tr.train_number}
                           onClick={(e) => {
@@ -184,9 +188,9 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                             onInspectTrain?.(tr.train_number);
                           }}
                           style={{
-                            background: 'rgba(56, 189, 248, 0.15)',
-                            border: '1px solid rgba(56, 189, 248, 0.4)',
-                            borderRadius: 6,
+                            background: 'var(--accent-cyan-subtle)',
+                            border: '1px solid var(--accent-cyan)',
+                            borderRadius: 'var(--radius-sm)',
                             padding: '4px 10px',
                             display: 'flex',
                             alignItems: 'center',
@@ -195,9 +199,9 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                             cursor: 'pointer'
                           }}
                         >
-                          <TrainIcon size={14} color="#38bdf8" />
-                          <span style={{ fontWeight: 600, color: '#e0f2fe' }}>{tr.train_number}</span>
-                          <span style={{ color: tr.delay_min > 0 ? '#fbbf24' : '#34d399', fontSize: '0.7rem' }}>
+                          <TrainIcon size={14} color="var(--accent-cyan)" />
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{tr.train_number}</span>
+                          <span style={{ color: tr.delay_min > 0 ? 'var(--accent-amber)' : 'var(--accent-emerald)', fontSize: '0.7rem', fontWeight: 600 }}>
                             {tr.delay_min > 0 ? `+${tr.delay_min}m` : 'On-Time'}
                           </span>
                         </div>
@@ -207,16 +211,17 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
 
                   {/* Inter-station Track Blocks (Up & Down lines) */}
                   {!isLast && nextStation && (
-                    <div style={{ padding: '0 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', width: 64, textTransform: 'uppercase' }}>
-                          Down Line
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', width: 68, textTransform: 'uppercase', fontWeight: 600 }}>
+                          Section Tracks
                         </span>
                         <div style={{ flex: 1, display: 'flex', gap: 10 }}>
                           {interBlocks.map((blk) => {
                             const simBlk = simBlocks[blk.code];
                             const blockColor = getBlockColor(blk.code);
                             const occupyingTrain = simBlk?.current_train ? simTrains[simBlk.current_train] : null;
+                            const isBlockSelected = selectedElement?.type === 'block' && selectedElement.data.code === blk.code;
 
                             return (
                               <div
@@ -225,51 +230,40 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
                                   setSelectedElement({ type: 'block', data: { ...blk, live: simBlk } });
                                   onInspectBlock?.(blk.code);
                                 }}
+                                className="interactive-card"
                                 style={{
                                   flex: 1,
-                                  background: 'rgba(0, 0, 0, 0.4)',
-                                  border: `1.5px solid ${blockColor}`,
-                                  borderRadius: 8,
-                                  padding: '10px 14px',
+                                  background: 'var(--bg-card-subtle)',
+                                  border: isBlockSelected ? '2px solid var(--accent-cyan)' : `1.5px solid ${blockColor}`,
+                                  borderRadius: 'var(--radius-sm)',
+                                  padding: '8px 12px',
                                   cursor: 'pointer',
-                                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                   display: 'flex',
                                   justifyContent: 'space-between',
                                   alignItems: 'center',
-                                  boxShadow: simBlk?.state === 'occupied' ? `0 0 14px ${blockColor}40` : undefined
+                                  boxShadow: simBlk?.state === 'occupied' ? `0 0 12px ${blockColor}40` : undefined
                                 }}
-                                onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-2px)')}
-                                onMouseLeave={(e) => (e.currentTarget.style.transform = 'none')}
                               >
                                 <div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.78rem', fontWeight: 600, color: blockColor }}>
+                                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 700, color: blockColor }}>
                                       {blk.code}
                                     </span>
-                                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                                      Idx {blk.block_index}
-                                    </span>
                                   </div>
-                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                                    {simBlk?.state?.toUpperCase() || 'AVAILABLE'}
-                                  </div>
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                                    {simBlk?.state ? simBlk.state.toUpperCase() : 'AVAILABLE'}
+                                  </span>
                                 </div>
 
-                                {occupyingTrain && (
-                                  <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 6,
-                                    background: 'rgba(56, 189, 248, 0.2)',
-                                    padding: '4px 8px',
-                                    borderRadius: 6,
-                                    border: '1px solid rgba(56, 189, 248, 0.4)'
-                                  }}>
-                                    <Navigation size={12} color="#38bdf8" style={{ transform: occupyingTrain.direction === 'down' ? 'rotate(180deg)' : 'none' }} />
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#ffffff' }}>
+                                {occupyingTrain ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--accent-cyan-subtle)', padding: '2px 6px', borderRadius: 4 }}>
+                                    <TrainIcon size={12} color="var(--accent-cyan)" />
+                                    <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                                       {occupyingTrain.train_number}
                                     </span>
                                   </div>
+                                ) : (
+                                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: blockColor }}></span>
                                 )}
                               </div>
                             );
@@ -284,88 +278,102 @@ export const CorridorMap: React.FC<CorridorMapProps> = ({
           </div>
         </div>
 
-        {/* Selected Element Details Drawer */}
+        {/* Selected Element Inspector Drawer */}
         {selectedElement && (
-          <div className="glass-panel" style={{ padding: 20, height: 'fit-content' }}>
+          <div className="glass-panel" style={{ padding: 20, height: 'fit-content', background: 'var(--bg-surface)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, textTransform: 'capitalize' }}>
-                {selectedElement.type} Inspector
-              </h3>
-              <button
-                className="btn btn-secondary"
-                style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Info size={16} color="var(--accent-cyan)" />
+                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Element Inspector
+                </h3>
+              </div>
+              <button 
                 onClick={() => setSelectedElement(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
-                Close
+                <X size={16} />
               </button>
             </div>
 
-            {selectedElement.type === 'block' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: '0.82rem' }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Block Code:</span>
-                  <div style={{ fontWeight: 600, fontSize: '1rem', color: '#38bdf8' }}>{selectedElement.data.code}</div>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Current Status:</span>
-                  <div style={{ fontWeight: 600, color: getBlockColor(selectedElement.data.code), textTransform: 'uppercase' }}>
-                    {selectedElement.data.live?.state || 'AVAILABLE'}
+            {selectedElement.type === 'station' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.82rem' }}>
+                <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Station Name:</span>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
+                    {selectedElement.data.name} ({selectedElement.data.code})
                   </div>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Occupying Train:</span>
-                  <div>{selectedElement.data.live?.current_train || 'None (Track Clear)'}</div>
+                <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Type & Facilities:</span>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
+                    {selectedElement.data.is_junction ? 'Junction Station' : 'Standard Station'} • {selectedElement.data.platform_count} Platform(s)
+                  </div>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Data Provenance:</span>
-                  <div>
-                    <span className="provenance-tag provenance-assumed">{selectedElement.data.provenance || 'ASSUMED'}</span>
+                <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Passing Loop Siding:</span>
+                  <div style={{ fontWeight: 600, color: selectedElement.data.has_passing_loop ? 'var(--accent-emerald)' : 'var(--text-muted)', marginTop: 2 }}>
+                    {selectedElement.data.has_passing_loop ? 'Available for train preemption' : 'No Loop'}
+                  </div>
+                </div>
+                <div style={{ padding: '8px 0' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Coordinates (Assumed):</span>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                    {selectedElement.data.lat.toFixed(4)}°N, {selectedElement.data.lon.toFixed(4)}°E
                   </div>
                 </div>
               </div>
             )}
 
-            {selectedElement.type === 'station' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: '0.82rem' }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Station Name:</span>
-                  <div style={{ fontWeight: 600, fontSize: '1rem' }}>{selectedElement.data.name} ({selectedElement.data.code})</div>
+            {selectedElement.type === 'block' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.82rem' }}>
+                <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Block Code:</span>
+                  <div style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', marginTop: 2 }}>
+                    {selectedElement.data.code}
+                  </div>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Platforms:</span>
-                  <div>{selectedElement.data.platform_count}</div>
+                <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Current Status:</span>
+                  <div style={{ fontWeight: 600, color: getBlockColor(selectedElement.data.code), marginTop: 2, textTransform: 'uppercase' }}>
+                    {selectedElement.data.live?.state || 'AVAILABLE'}
+                  </div>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Junction:</span>
-                  <div>{selectedElement.data.is_junction ? 'Yes' : 'No'}</div>
+                <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Section Segment:</span>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
+                    {selectedElement.data.section_from} → {selectedElement.data.section_to}
+                  </div>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Passing Loop Siding:</span>
-                  <div>{selectedElement.data.has_passing_loop ? 'Available' : 'None'}</div>
-                </div>
+                {selectedElement.data.live?.current_train && (
+                  <div style={{ padding: '8px 0' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Occupying Train:</span>
+                    <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', marginTop: 2 }}>
+                      Train {selectedElement.data.live.current_train}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {selectedElement.type === 'train' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: '0.82rem' }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Train:</span>
-                  <div style={{ fontWeight: 600, fontSize: '1rem', color: '#38bdf8' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.82rem' }}>
+                <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Train Service:</span>
+                  <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', marginTop: 2 }}>
                     {selectedElement.data.train_number} — {selectedElement.data.name}
                   </div>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Status:</span>
-                  <div style={{ textTransform: 'uppercase', fontWeight: 600 }}>{selectedElement.data.status}</div>
+                <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Status & Direction:</span>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: 2, textTransform: 'capitalize' }}>
+                    {selectedElement.data.status.replace('_', ' ')} • {selectedElement.data.direction.toUpperCase()} Bound
+                  </div>
                 </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Direction:</span>
-                  <div style={{ textTransform: 'capitalize' }}>{selectedElement.data.direction}</div>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Delay:</span>
-                  <div style={{ color: selectedElement.data.delay_min > 0 ? '#fbbf24' : '#34d399', fontWeight: 600 }}>
-                    {selectedElement.data.delay_min > 0 ? `+${selectedElement.data.delay_min} mins` : 'On Time'}
+                <div style={{ padding: '8px 0' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Accrued Delay:</span>
+                  <div style={{ fontWeight: 700, color: selectedElement.data.delay_min > 0 ? 'var(--accent-amber)' : 'var(--accent-emerald)', marginTop: 2 }}>
+                    {selectedElement.data.delay_min > 0 ? `+${selectedElement.data.delay_min} mins` : 'On-Time'}
                   </div>
                 </div>
               </div>

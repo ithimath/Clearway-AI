@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     blocks_per_section: int = 2
     """Number of blocks derived per station-to-station section (ASSUMED)."""
 
-    corridor_name: str = "Delhi-Agra"
+    corridor_name: str = "Chennai-Madurai"
     """Name of the Indian Railways corridor selected for demo."""
 
     # Solver

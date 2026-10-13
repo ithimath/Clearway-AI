@@ -68,6 +68,54 @@ def _load_network_data(db: Session) -> tuple[list[dict], list[dict], list[dict],
     return trains, stop_times, sections, blocks
 
 
+def _format_conflict_record(
+    conflict_uid: str,
+    conflict_type: str,
+    severity: str,
+    trains: list[str],
+    resource_code: str,
+    interval_start_min: int,
+    interval_end_min: int,
+    explanation: str,
+    rule_source: str,
+    suggested_actions: list[str],
+    context: str = "baseline",
+    record_id: int | None = None,
+    detected_at: str | None = None,
+) -> dict:
+    t1 = trains[0] if trains else ""
+    t2 = trains[1] if len(trains) > 1 else ""
+    is_block = (
+        resource_code.startswith("BLK_")
+        or resource_code.startswith("BLK-")
+        or resource_code.startswith("SEC_")
+        or resource_code.startswith("SEC-")
+    )
+    return {
+        "id": record_id,
+        "conflict_uid": conflict_uid,
+        "conflict_type": conflict_type,
+        "severity": severity,
+        "trains": trains,
+        "train_1_number": t1,
+        "train_2_number": t2,
+        "resource_code": resource_code,
+        "block_code": resource_code if is_block else None,
+        "station_code": resource_code if not is_block else None,
+        "interval_start_min": interval_start_min,
+        "interval_end_min": interval_end_min,
+        "start_time_min": interval_start_min,
+        "end_time_min": interval_end_min,
+        "explanation": explanation,
+        "rule_source": rule_source,
+        "suggested_actions": suggested_actions,
+        "suggested_action": suggested_actions[0] if suggested_actions else "",
+        "provenance": "algorithm_detected",
+        "context": context,
+        "detected_at": detected_at,
+    }
+
+
 @router.get("/conflicts")
 def list_conflicts(
     context: str = Query("baseline"),
@@ -80,23 +128,34 @@ def list_conflicts(
         q = q.filter(ConflictRecord.severity == severity)
     records = q.order_by(ConflictRecord.detected_at.desc()).all()
     return [
-        {
-            "id": r.id,
-            "conflict_uid": r.conflict_uid,
-            "conflict_type": r.conflict_type,
-            "severity": r.severity,
-            "trains": json.loads(r.trains_json),
-            "resource_code": r.resource_code,
-            "interval_start_min": r.interval_start_min,
-            "interval_end_min": r.interval_end_min,
-            "explanation": r.explanation,
-            "rule_source": r.rule_source,
-            "suggested_actions": json.loads(r.suggested_actions_json),
-            "context": r.context,
-            "detected_at": r.detected_at.isoformat(),
-        }
+        _format_conflict_record(
+            conflict_uid=r.conflict_uid,
+            conflict_type=r.conflict_type,
+            severity=r.severity,
+            trains=json.loads(r.trains_json),
+            resource_code=r.resource_code,
+            interval_start_min=r.interval_start_min,
+            interval_end_min=r.interval_end_min,
+            explanation=r.explanation,
+            rule_source=r.rule_source,
+            suggested_actions=json.loads(r.suggested_actions_json),
+            context=r.context,
+            record_id=r.id,
+            detected_at=r.detected_at.isoformat() if r.detected_at else None,
+        )
         for r in records
     ]
+
+
+@router.get("/conflicts/list")
+def list_conflicts_envelope(
+    context: str = Query("baseline"),
+    severity: str = Query(""),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Return persisted conflict records wrapped in an object with count."""
+    items = list_conflicts(context=context, severity=severity, db=db)
+    return {"conflicts": items, "count": len(items)}
 
 
 @router.post("/conflicts/detect")
@@ -121,6 +180,7 @@ def detect_conflicts(
     # Clear old conflicts for this context
     db.query(ConflictRecord).filter(ConflictRecord.context == context).delete()
 
+    persisted = []
     for r in results:
         rec = ConflictRecord(
             conflict_uid=r.conflict_uid,
@@ -136,6 +196,7 @@ def detect_conflicts(
             context=context,
         )
         db.add(rec)
+        persisted.append(r)
 
     ev = SystemEvent(
         category="conflict",
@@ -149,14 +210,19 @@ def detect_conflicts(
         "count": len(results),
         "context": context,
         "conflicts": [
-            {
-                "conflict_uid": r.conflict_uid,
-                "conflict_type": r.conflict_type.value,
-                "severity": r.severity.value,
-                "trains": r.trains,
-                "resource_code": r.resource_code,
-                "explanation": r.explanation,
-            }
+            _format_conflict_record(
+                conflict_uid=r.conflict_uid,
+                conflict_type=r.conflict_type.value,
+                severity=r.severity.value,
+                trains=r.trains,
+                resource_code=r.resource_code,
+                interval_start_min=r.interval_start_min,
+                interval_end_min=r.interval_end_min,
+                explanation=r.explanation,
+                rule_source=r.rule_source,
+                suggested_actions=r.suggested_actions,
+                context=context,
+            )
             for r in results
         ],
     }

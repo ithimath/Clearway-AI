@@ -7,6 +7,7 @@ by the polling mechanism. Thread safety: a single threading.Lock guards state.
 from __future__ import annotations
 
 import threading
+import time
 from typing import Optional
 
 from app.domain.simulator import Simulator
@@ -19,6 +20,23 @@ class SimulationService:
         self._lock = threading.Lock()
         self._sim: Optional[Simulator] = None
         self._initialized = False
+        self._ticker_thread: Optional[threading.Thread] = None
+        self._stop_ticker = threading.Event()
+
+    def _ensure_ticker_started(self) -> None:
+        if self._ticker_thread is None or not self._ticker_thread.is_alive():
+            self._stop_ticker.clear()
+            self._ticker_thread = threading.Thread(target=self._ticker_loop, daemon=True)
+            self._ticker_thread.start()
+
+    def _ticker_loop(self) -> None:
+        while not self._stop_ticker.is_set():
+            speed = 1.0
+            with self._lock:
+                if self._sim and self._sim.get_state().is_running:
+                    self._sim.step()
+                    speed = max(0.1, self._sim.get_state().speed_factor)
+            time.sleep(max(0.05, 1.0 / speed))
 
     def initialize(
         self,
@@ -55,6 +73,7 @@ class SimulationService:
             self._sim = Simulator(stations, sections, enriched_blocks, trains, stop_times)
             self._sim.reset()
             self._initialized = True
+        self._ensure_ticker_started()
 
     def is_initialized(self) -> bool:
         return self._initialized
@@ -63,6 +82,7 @@ class SimulationService:
         with self._lock:
             if self._sim:
                 self._sim.start()
+        self._ensure_ticker_started()
 
     def pause(self) -> None:
         with self._lock:

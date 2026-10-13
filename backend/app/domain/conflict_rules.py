@@ -97,32 +97,24 @@ def build_block_occupancy(
     """Build a map of block_code → list of occupancy windows.
 
     Each window: {train_number, direction, entry_min, exit_min}
-
-    Args:
-        trains:    [{train_number, direction, priority}]
-        stop_times: [{train_number, station_code, stop_sequence,
-                      planned_arrival_min, planned_departure_min,
-                      revised_arrival_min, revised_departure_min, dwell_min}]
-        sections:  [{from_station_code, to_station_code, running_time_min, headway_min, is_double_track}]
-        blocks:    [{code, section_from, section_to, block_index, time_fraction}]
-        use_revised: Use revised times if available, else planned.
-
-    Returns:
-        dict mapping block_code → sorted list of occupancy windows.
+    Supports forward and reverse section traversal, mapping single-track
+    sections to shared physical blocks and double-track return lines to separate blocks.
     """
-    # Index stop_times by train
     stops_by_train: dict[str, list[dict]] = {}
     for st in stop_times:
         stops_by_train.setdefault(st["train_number"], []).append(st)
     for tn in stops_by_train:
         stops_by_train[tn].sort(key=lambda s: s["stop_sequence"])
 
-    # Index sections by (from, to)
-    section_map: dict[tuple[str, str], dict] = {
-        (s["from_station_code"], s["to_station_code"]): s for s in sections
-    }
+    # Index sections by forward and reverse: (from, to) -> (section, is_reversed)
+    section_map: dict[tuple[str, str], tuple[dict, bool]] = {}
+    for s in sections:
+        f_st = s["from_station_code"]
+        t_st = s["to_station_code"]
+        section_map[(f_st, t_st)] = (s, False)
+        # Reverse mapping:
+        section_map[(t_st, f_st)] = (s, True)
 
-    # Index blocks by (from, to) → sorted by block_index
     blocks_by_section: dict[tuple[str, str], list[dict]] = {}
     for blk in blocks:
         key = (blk["section_from"], blk["section_to"])
@@ -145,24 +137,26 @@ def build_block_occupancy(
             from_st = cur["station_code"]
             to_st = nxt["station_code"]
 
-            # Departure from current station
-            if use_revised and cur.get("revised_departure_min") is not None:
-                dep_min = cur["revised_departure_min"]
-            else:
-                dep_min = cur.get("planned_departure_min")
-
+            dep_min = cur.get("revised_departure_min") if use_revised and cur.get("revised_departure_min") is not None else cur.get("planned_departure_min")
             if dep_min is None:
                 continue
 
-            sec = section_map.get((from_st, to_st))
-            if sec is None:
+            sec_info = section_map.get((from_st, to_st))
+            if sec_info is None:
                 continue
+            sec, is_reversed = sec_info
             rt = sec["running_time_min"]
 
-            blks = blocks_by_section.get((from_st, to_st), [])
+            # Blocks are indexed by canonical (section_from, section_to)
+            blks = list(blocks_by_section.get((sec["from_station_code"], sec["to_station_code"]), []))
             if not blks:
                 continue
 
+            # In reverse traversal, train traverses the blocks in reverse order
+            if is_reversed:
+                blks = list(reversed(blks))
+
+            is_double = sec.get("is_double_track", False)
             t = dep_min
             for blk in blks:
                 traverse = max(1, round(rt * blk["time_fraction"]))
@@ -172,10 +166,16 @@ def build_block_occupancy(
                     "entry_min": t,
                     "exit_min": t + traverse,
                 }
-                occupancy.setdefault(blk["code"], []).append(win)
+                # On single-track sections, both directions share the exact physical block code
+                # On double-track sections, the reverse direction runs on the return line (-REV)
+                if is_double and is_reversed:
+                    blk_code = f"{blk['code']}-REV"
+                else:
+                    blk_code = blk["code"]
+
+                occupancy.setdefault(blk_code, []).append(win)
                 t += traverse
 
-    # Sort each block's windows by entry time
     for code in occupancy:
         occupancy[code].sort(key=lambda w: w["entry_min"])
 
@@ -186,23 +186,41 @@ def build_block_occupancy(
 # Conflict detection rules
 # ---------------------------------------------------------------------------
 
+def _get_section_for_block(
+    block_code: str,
+    sections: list[dict],
+    blocks: list[dict] | None = None,
+) -> dict | None:
+    """Helper to find track section corresponding to a block code."""
+    clean_code = block_code.replace("-REV", "")
+    if blocks:
+        for b in blocks:
+            if b.get("code") == clean_code:
+                sf = b.get("section_from")
+                st = b.get("section_to")
+                for s in sections:
+                    if (s["from_station_code"], s["to_station_code"]) in [(sf, st), (st, sf)]:
+                        return s
+    parts = clean_code.split("-")
+    if len(parts) >= 3:
+        p1, p2 = parts[1], parts[2]
+        for s in sections:
+            if (s["from_station_code"], s["to_station_code"]) in [(p1, p2), (p2, p1)]:
+                return s
+    return None
+
+
 def detect_reservation_overlaps(
     occupancy: dict[str, list[dict]],
     sections: list[dict],
     context: str = "baseline",
+    blocks: list[dict] | None = None,
 ) -> list[ConflictResult]:
     """Rule 1: Two trains occupy the same exclusive (single-track) block simultaneously."""
-    section_map = {
-        (s["from_station_code"], s["to_station_code"]): s for s in sections
-    }
     conflicts: list[ConflictResult] = []
 
     for block_code, windows in occupancy.items():
-        # Determine section from block code (format: BLK-FROM-TO-IDX)
-        parts = block_code.split("-")
-        from_st = parts[1] if len(parts) > 2 else ""
-        to_st = parts[2] if len(parts) > 2 else ""
-        sec = section_map.get((from_st, to_st))
+        sec = _get_section_for_block(block_code, sections, blocks)
         is_double = sec.get("is_double_track", False) if sec else False
 
         for i, w1 in enumerate(windows):
@@ -216,12 +234,12 @@ def detect_reservation_overlaps(
                     conflict_type=ConflictType.RESERVATION_OVERLAP,
                     severity=Severity.CRITICAL,
                     trains=[w1["train_number"], w2["train_number"]],
-                    resource_code=block_code,
+                    resource_code=block_code.replace("-REV", ""),
                     interval_start_min=max(w1["entry_min"], w2["entry_min"]),
                     interval_end_min=min(w1["exit_min"], w2["exit_min"]),
                     explanation=(
                         f"Trains {w1['train_number']} and {w2['train_number']} "
-                        f"both occupy block {block_code} between "
+                        f"both occupy block {block_code.replace('-REV', '')} between "
                         f"{max(w1['entry_min'], w2['entry_min'])} and "
                         f"{min(w1['exit_min'], w2['exit_min'])} minutes. "
                         f"Track is {'double' if is_double else 'single'}. "
@@ -241,18 +259,13 @@ def detect_headway_violations(
     occupancy: dict[str, list[dict]],
     sections: list[dict],
     context: str = "baseline",
+    blocks: list[dict] | None = None,
 ) -> list[ConflictResult]:
     """Rule 2: Consecutive same-direction trains closer than headway_min."""
-    section_map = {
-        (s["from_station_code"], s["to_station_code"]): s for s in sections
-    }
     conflicts: list[ConflictResult] = []
 
     for block_code, windows in occupancy.items():
-        parts = block_code.split("-")
-        from_st = parts[1] if len(parts) > 2 else ""
-        to_st = parts[2] if len(parts) > 2 else ""
-        sec = section_map.get((from_st, to_st))
+        sec = _get_section_for_block(block_code, sections, blocks)
         headway = sec.get("headway_min", 5) if sec else 5
 
         same_dir: dict[str, list[dict]] = {}
@@ -264,17 +277,17 @@ def detect_headway_violations(
             for i in range(len(dir_windows) - 1):
                 w1, w2 = dir_windows[i], dir_windows[i + 1]
                 gap = w2["entry_min"] - w1["entry_min"]
-                if 0 < gap < headway:
+                if 0 <= gap < headway:
                     conflicts.append(ConflictResult.make(
                         conflict_type=ConflictType.HEADWAY_VIOLATION,
                         severity=Severity.HIGH,
                         trains=[w1["train_number"], w2["train_number"]],
-                        resource_code=block_code,
+                        resource_code=block_code.replace("-REV", ""),
                         interval_start_min=w1["entry_min"],
                         interval_end_min=w2["entry_min"],
                         explanation=(
                             f"Trains {w1['train_number']} and {w2['train_number']} "
-                            f"enter block {block_code} only {gap} min apart "
+                            f"enter block {block_code.replace('-REV', '')} only {gap} min apart "
                             f"(minimum headway: {headway} min). Direction: {direction}."
                         ),
                         rule_source="ASSUMED",
@@ -291,18 +304,15 @@ def detect_opposing_movements(
     occupancy: dict[str, list[dict]],
     sections: list[dict],
     context: str = "baseline",
+    blocks: list[dict] | None = None,
 ) -> list[ConflictResult]:
     """Rule 3: Opposing trains on a single-track section at the same time."""
-    section_map = {
-        (s["from_station_code"], s["to_station_code"]): s for s in sections
-    }
     conflicts: list[ConflictResult] = []
 
     for block_code, windows in occupancy.items():
-        parts = block_code.split("-")
-        from_st = parts[1] if len(parts) > 2 else ""
-        to_st = parts[2] if len(parts) > 2 else ""
-        sec = section_map.get((from_st, to_st))
+        if block_code.endswith("-REV"):
+            continue  # Double track return line
+        sec = _get_section_for_block(block_code, sections, blocks)
         if sec and sec.get("is_double_track", False):
             continue  # double track: no opposing conflict
 
@@ -396,8 +406,8 @@ def detect_all(
     occ = build_block_occupancy(trains, stop_times, sections, blocks, use_revised)
 
     results: list[ConflictResult] = []
-    results.extend(detect_reservation_overlaps(occ, sections, context))
-    results.extend(detect_headway_violations(occ, sections, context))
-    results.extend(detect_opposing_movements(occ, sections, context))
+    results.extend(detect_reservation_overlaps(occ, sections, context, blocks))
+    results.extend(detect_headway_violations(occ, sections, context, blocks))
+    results.extend(detect_opposing_movements(occ, sections, context, blocks))
     results.extend(detect_closure_conflicts(occ, closed_blocks, context))
     return results

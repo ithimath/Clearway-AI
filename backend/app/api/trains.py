@@ -34,7 +34,9 @@ def list_trains(
         q = q.filter(Train.train_type == train_type)
     trains = q.all()
 
-    station_map = {s.id: s.code for s in db.query(Station).all()}
+    stations = db.query(Station).all()
+    station_map = {s.id: s.code for s in stations}
+    station_name_map = {s.id: s.name for s in stations}
 
     result = []
     for t in trains:
@@ -43,6 +45,23 @@ def list_trains(
         dest = station_map.get(stops[-1].station_id, "") if stops else ""
         dep = stops[0].planned_departure_min if stops else None
         arr = stops[-1].planned_arrival_min if stops else None
+        stop_list = [
+            {
+                "id": s.id,
+                "train_id": s.train_id,
+                "stop_sequence": s.stop_sequence,
+                "station_id": s.station_id,
+                "station_code": station_map.get(s.station_id, ""),
+                "station_name": station_name_map.get(s.station_id, ""),
+                "planned_arrival_min": s.planned_arrival_min,
+                "planned_departure_min": s.planned_departure_min,
+                "revised_arrival_min": s.revised_arrival_min,
+                "revised_departure_min": s.revised_departure_min,
+                "dwell_min": s.dwell_min,
+                "provenance": s.provenance,
+            }
+            for s in stops
+        ]
         result.append(
             {
                 "id": t.id,
@@ -58,6 +77,7 @@ def list_trains(
                 "planned_arrival_min": arr,
                 "stop_count": len(stops),
                 "provenance": t.provenance,
+                "stops": stop_list,
             }
         )
     return result

@@ -6,14 +6,16 @@ import {
   FastForward, 
   AlertTriangle, 
   Map, 
-  Activity, 
   Wrench, 
   Cpu, 
   FlaskConical, 
   BarChart3, 
-  GitCommit 
+  GitCommit,
+  Sun,
+  Moon
 } from 'lucide-react';
 import type { SimulationState } from '../types';
+import { useTheme } from '../context/ThemeContext';
 
 interface HeaderProps {
   activeTab: string;
@@ -38,6 +40,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSetSpeed,
   conflictCount,
 }) => {
+  const { theme, toggleTheme } = useTheme();
+
   // Format minutes from midnight to HH:MM
   const formatTime = (totalMin: number = 0) => {
     const hours = Math.floor(totalMin / 60) % 24;
@@ -65,130 +69,145 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header>
-      {/* Top Academic Disclaimer Banner */}
-      <div className="disclaimer-banner">
-        <AlertTriangle size={14} />
-        <span>Academic/Hackathon Decision Support Prototype — NOT a certified signalling or safety critical system. Do not use to control real trains.</span>
-      </div>
-
       <div className="header-bar">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div 
+          className="header-top-row" 
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 14 }}
+        >
           {/* Logo & Subtitle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
-              width: 38,
-              height: 38,
+              width: 40,
+              height: 40,
               borderRadius: 10,
-              background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
+              background: 'linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-primary) 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 16px rgba(6, 182, 212, 0.45)'
+              boxShadow: '0 0 16px var(--accent-primary-glow)',
+              overflow: 'hidden'
             }}>
-              <Activity size={22} color="#ffffff" />
+              <img src="/favicon-48x48.png" alt="Clearway AI Logo" style={{ width: 30, height: 30, objectFit: 'contain' }} />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.35rem', fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
                   Clearway AI
                 </h1>
-                <span className="signal-live" title="Backend Live"></span>
+                <span className="signal-live" title="Backend Live & Operational"></span>
                 <span className="provenance-tag provenance-derived">DECISION SUPPORT</span>
               </div>
               <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                Delhi–Agra Corridor Block Planning & Maintenance Window Optimizer
+                Southern Railway (Chennai–Madurai Corridor) Block Planning & Timetable Optimizer
               </p>
             </div>
           </div>
 
-          {/* Simulation Controls & Clock Widget */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            background: 'rgba(0, 0, 0, 0.4)',
-            padding: '6px 14px',
-            borderRadius: 12,
-            border: '1px solid var(--border-subtle)'
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginRight: 6 }}>
-              <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Sim Clock
-              </span>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '1.25rem', fontWeight: 700, color: '#38bdf8' }}>
-                  {formatTime(currentMinutes)}
+          {/* Right Controls: Simulation Controls + Clock + Theme Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Simulation Clock & Controls */}
+            <div 
+              className="clock-widget" 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                background: 'var(--bg-card-subtle)',
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--border-subtle)',
+                boxShadow: 'var(--shadow-sm)'
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginRight: 4 }}>
+                <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                  Sim Clock {isRunning && <span style={{ color: 'var(--accent-emerald)' }}>● Live</span>}
                 </span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                  ({currentMinutes}m)
-                </span>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
+                    {formatTime(currentMinutes)}
+                  </span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                    ({currentMinutes}m)
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {isRunning ? (
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: '6px 12px' }} 
+                    onClick={onPauseSim}
+                    title="Pause Simulation"
+                  >
+                    <Pause size={14} color="var(--accent-amber)" />
+                    <span>Pause</span>
+                  </button>
+                ) : (
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ padding: '6px 12px' }} 
+                    onClick={onStartSim}
+                    title="Run Simulation"
+                  >
+                    <Play size={14} />
+                    <span>Run</span>
+                  </button>
+                )}
+
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ padding: '6px 10px' }} 
+                  onClick={() => onStepSim(1)}
+                  title="Advance 1 Minute"
+                >
+                  <FastForward size={14} />
+                  <span>+1m</span>
+                </button>
+
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ padding: '6px 10px' }} 
+                  onClick={() => onResetSim(360)}
+                  title="Reset Sim to 06:00"
+                >
+                  <RotateCcw size={14} />
+                </button>
+
+                {/* Speed selector */}
+                <select
+                  value={simState?.speed_factor ?? 1}
+                  onChange={(e) => onSetSpeed(Number(e.target.value))}
+                  style={{
+                    padding: '6px 8px',
+                    fontSize: '0.76rem',
+                    cursor: 'pointer'
+                  }}
+                  title="Simulation Speed"
+                >
+                  <option value={0.5}>0.5x</option>
+                  <option value={1}>1.0x</option>
+                  <option value={2}>2.0x</option>
+                  <option value={5}>5.0x</option>
+                  <option value={10}>10.0x</option>
+                </select>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {isRunning ? (
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ padding: '6px 12px' }} 
-                  onClick={onPauseSim}
-                  title="Pause Simulation"
-                >
-                  <Pause size={15} color="#f59e0b" />
-                  <span>Pause</span>
-                </button>
+            {/* Theme Toggle Button */}
+            <button 
+              className="theme-toggle-btn"
+              onClick={toggleTheme}
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? (
+                <Sun size={18} color="var(--accent-amber)" />
               ) : (
-                <button 
-                  className="btn btn-primary" 
-                  style={{ padding: '6px 12px' }} 
-                  onClick={onStartSim}
-                  title="Run Simulation"
-                >
-                  <Play size={15} />
-                  <span>Run</span>
-                </button>
+                <Moon size={18} color="var(--accent-primary)" />
               )}
-
-              <button 
-                className="btn btn-secondary" 
-                style={{ padding: '6px 10px' }} 
-                onClick={() => onStepSim(1)}
-                title="Advance 1 Minute"
-              >
-                <FastForward size={14} />
-                <span>+1m</span>
-              </button>
-
-              <button 
-                className="btn btn-secondary" 
-                style={{ padding: '6px 10px' }} 
-                onClick={() => onResetSim(360)}
-                title="Reset Sim to 06:00"
-              >
-                <RotateCcw size={14} />
-              </button>
-
-              {/* Speed selector */}
-              <select
-                value={simState?.speed_factor ?? 1}
-                onChange={(e) => onSetSpeed(Number(e.target.value))}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 6,
-                  padding: '6px 8px',
-                  fontSize: '0.78rem',
-                  outline: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                <option value={0.5} style={{ background: '#0e1422' }}>0.5x</option>
-                <option value={1} style={{ background: '#0e1422' }}>1x</option>
-                <option value={2} style={{ background: '#0e1422' }}>2x</option>
-                <option value={5} style={{ background: '#0e1422' }}>5x</option>
-                <option value={10} style={{ background: '#0e1422' }}>10x</option>
-              </select>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -207,11 +226,11 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>{tab.label}</span>
                 {tab.badge !== undefined && (
                   <span style={{
-                    background: '#f43f5e',
+                    background: 'var(--accent-rose)',
                     color: '#ffffff',
                     fontSize: '0.68rem',
                     padding: '1px 6px',
-                    borderRadius: 10,
+                    borderRadius: 'var(--radius-full)',
                     fontWeight: 700
                   }}>
                     {tab.badge}
