@@ -46,9 +46,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -61,3 +65,8 @@ for router_module in [
     scenarios, jobs, rl, data, export,
 ]:
     app.include_router(router_module.router)
+
+# Mount compiled frontend dist if available so http://127.0.0.1:8000 also serves the UI
+_dist_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if _dist_dir.exists():
+    app.mount("/", StaticFiles(directory=str(_dist_dir), html=True), name="frontend")

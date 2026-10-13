@@ -55,20 +55,26 @@ const AppContent: React.FC = () => {
     setIsInitialLoading(true);
     setInitialLoadError(null);
     try {
+      let netError: string | null = null;
       const [netData, trData, confData, metricData, jobsData, simData] = await Promise.all([
-        api.getNetwork().catch((e) => { console.error('getNetwork failed:', e); return null; }),
-        api.getTrains().catch((e) => { console.error('getTrains failed:', e); return []; }),
-        api.getConflicts().catch((e) => { console.error('getConflicts failed:', e); return { conflicts: [], count: 0 }; }),
-        api.getMetrics().catch((e) => { console.error('getMetrics failed:', e); return null; }),
-        api.getMaintenanceJobs().catch((e) => { console.error('getMaintenanceJobs failed:', e); return []; }),
-        api.getSimState().catch((e) => { console.error('getSimState failed:', e); return null; }),
+        api.getNetwork(true).catch((e) => {
+          console.error('getNetwork failed:', e);
+          netError = e.message;
+          return null;
+        }),
+        api.getTrains().catch(() => []),
+        api.getConflicts().catch(() => ({ conflicts: [], count: 0 })),
+        api.getMetrics().catch(() => null),
+        api.getMaintenanceJobs().catch(() => []),
+        api.getSimState().catch(() => null),
       ]);
 
       if (netData) {
         setNetwork(netData);
         if (netData.blocks) setBlocks(netData.blocks);
+        setInitialLoadError(null);
       } else {
-        setInitialLoadError('Unable to load railway network infrastructure. Verify backend is running at http://127.0.0.1:8000.');
+        setInitialLoadError(netError || 'Unable to load railway network infrastructure. Verify backend is running at http://127.0.0.1:8000.');
       }
 
       if (trData && trData.length > 0) setTrains(trData);

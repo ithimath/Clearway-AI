@@ -45,16 +45,58 @@ async function request<T>(endpoint: string, options?: RequestInit & { timeoutMs?
 
   const fetchPromise = (async () => {
     try {
-      const res = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options?.headers,
-        },
-        signal: controller.signal,
-        ...options,
-      });
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...options?.headers,
+          },
+          signal: controller.signal,
+          ...options,
+        });
+      } catch (fetchErr: any) {
+        // If relative /api proxy failed, attempt direct connection to backend at 127.0.0.1:8000
+        if (url.startsWith('/api') && typeof window !== 'undefined') {
+          const directUrl = `http://127.0.0.1:8000/api${endpoint}`;
+          try {
+            res = await fetch(directUrl, {
+              headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers,
+              },
+              signal: controller.signal,
+              ...options,
+            });
+          } catch {
+            throw fetchErr;
+          }
+        } else {
+          throw fetchErr;
+        }
+      }
 
       clearTimeout(timeoutId);
+
+      // If Vite proxy returns 502/504 Bad Gateway, retry with direct backend URL
+      if (!res.ok && (res.status === 502 || res.status === 504) && url.startsWith('/api') && typeof window !== 'undefined') {
+        const directUrl = `http://127.0.0.1:8000/api${endpoint}`;
+        try {
+          const directRes = await fetch(directUrl, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...options?.headers,
+            },
+            signal: controller.signal,
+            ...options,
+          });
+          if (directRes.ok) {
+            return await directRes.json();
+          }
+        } catch {
+          // fall through to error handling below
+        }
+      }
 
       if (!res.ok) {
         let errorBody = '';
