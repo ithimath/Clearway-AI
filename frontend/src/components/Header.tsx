@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { SimulationState } from '../types';
 import { useTheme } from '../context/ThemeContext';
+import { api } from '../api/client';
 
 interface HeaderProps {
   activeTab: string;
@@ -41,6 +42,14 @@ const HeaderComponent: React.FC<HeaderProps> = ({
   conflictCount,
 }) => {
   const { theme, toggleTheme } = useTheme();
+  const [connectionMode, setConnectionMode] = React.useState<'connected' | 'standalone'>(api.getConnectionMode());
+
+  React.useEffect(() => {
+    const unsub = api.onConnectionModeChange(setConnectionMode);
+    return () => {
+      unsub();
+    };
+  }, []);
 
   // Format minutes from midnight to HH:MM
   const formatTime = (totalMin: number = 0) => {
@@ -94,7 +103,27 @@ const HeaderComponent: React.FC<HeaderProps> = ({
                 <h1 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.35rem', fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
                   Clearway AI
                 </h1>
-                <span className="signal-live" title="Backend Live & Operational"></span>
+                {connectionMode === 'connected' ? (
+                  <>
+                    <span className="signal-live" title="FastAPI Backend Live & Operational"></span>
+                    <span className="provenance-tag provenance-observed" style={{ fontSize: '0.68rem', letterSpacing: '0.04em' }}>BACKEND LIVE</span>
+                  </>
+                ) : (
+                  <>
+                    <span 
+                      style={{ 
+                        width: 8, 
+                        height: 8, 
+                        borderRadius: '50%', 
+                        background: 'var(--accent-cyan)', 
+                        display: 'inline-block',
+                        boxShadow: '0 0 8px var(--accent-cyan)' 
+                      }} 
+                      title="Standalone Resilient Simulator Active"
+                    />
+                    <span className="provenance-tag provenance-derived" style={{ fontSize: '0.68rem', letterSpacing: '0.04em', color: 'var(--accent-cyan)' }}>STANDALONE MODE</span>
+                  </>
+                )}
                 <span className="provenance-tag provenance-derived">DECISION SUPPORT</span>
               </div>
               <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
