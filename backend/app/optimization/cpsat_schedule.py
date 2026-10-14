@@ -422,13 +422,40 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
             }
             for s in db.query(StopTime).all()
         ]
-        post_conflicts = detect_all(trains_dicts, revised_stop_dicts, section_dicts, block_dicts,
-                                    closed_blocks=closed_blocks, use_revised=True)
+        # Run independent verification engine (plain Python, no OR-Tools)
+        from app.domain.verifier import verify_schedule_integrity
+        station_dicts = [
+            {"code": s.code, "name": s.name, "platform_count": s.platform_count, "has_passing_loop": s.has_passing_loop}
+            for s in db.query(Station).all()
+        ]
+        maint_window_dicts = [
+            {"block_code": bc, "start_min": sm, "end_min": em}
+            for bc, sm, em in maintenance_windows
+        ]
+        ver_res = verify_schedule_integrity(
+            trains=trains_dicts,
+            stop_times=revised_stop_dicts,
+            sections=section_dicts,
+            blocks=block_dicts,
+            stations=station_dicts,
+            closed_windows=maint_window_dicts,
+        )
 
-        explanation = _build_explanation(status_str, len(trains_raw), len(baseline_conflicts),
-                                         len(post_conflicts), float(total_assigned_delay), solve_time, weights)
+        final_status = status_str
+        if not ver_res.is_valid:
+            final_status = "VERIFICATION_FAILED"
+            explanation = (
+                f"[INDEPENDENT VERIFICATION FAILED: {ver_res.violation_count} safety violations detected] "
+                + explanation
+            )
+        else:
+            explanation = (
+                f"[INDEPENDENT VERIFICATION PASSED: 0 safety violations across {len(ver_res.checks_passed)} checks] "
+                + explanation
+            )
+
         return {
-            "solver_status": status_str,
+            "solver_status": final_status,
             "solve_time_s": round(solve_time, 3),
             "objective_value": float(solver.objective_value) if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else None,
             "delay_before_min": float(sum(
@@ -441,6 +468,8 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
             "conflicts_after": len(post_conflicts),
             "revised_schedule": revised_schedule,
             "explanation": explanation,
+            "verified": ver_res.is_valid,
+            "verification_report": ver_res.to_dict(),
         }
     else:
         explanation = (
