@@ -114,7 +114,63 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
         for s in stops_raw
     ]
 
-    closed_blocks = {b.code for b in blocks_raw if b.state == "closed"}
+    # Gather maintenance closure windows: (block_code, start_min, end_min)
+    maintenance_windows: list[tuple[str, int, int]] = []
+    closed_blocks: set[str] = set()
+
+    for b in blocks_raw:
+        if b.state == "closed":
+            closed_blocks.add(b.code)
+            maintenance_windows.append((b.code, 0, HORIZON))
+
+    extra_closed = weights.get("closed_blocks", [])
+    if isinstance(extra_closed, (list, set)):
+        for cb in extra_closed:
+            closed_blocks.add(str(cb))
+            maintenance_windows.append((str(cb), 0, HORIZON))
+
+    try:
+        from app.models.maintenance import MaintenanceJob, MaintenancePlan
+        m_plans = db.query(MaintenancePlan).all()
+        for mp in m_plans:
+            job = mp.job
+            if job and job.block_codes_json:
+                try:
+                    b_codes = json.loads(job.block_codes_json)
+                    for b_code in b_codes:
+                        closed_blocks.add(str(b_code))
+                        maintenance_windows.append((
+                            str(b_code),
+                            int(mp.assigned_start_min),
+                            int(mp.assigned_end_min),
+                        ))
+                except Exception:
+                    pass
+        active_jobs = db.query(MaintenanceJob).filter(MaintenanceJob.status == "active").all()
+        for aj in active_jobs:
+            if aj.block_codes_json:
+                try:
+                    b_codes = json.loads(aj.block_codes_json)
+                    s_min = int(aj.earliest_start_min)
+                    e_min = min(HORIZON, s_min + int(aj.duration_min))
+                    for b_code in b_codes:
+                        closed_blocks.add(str(b_code))
+                        maintenance_windows.append((str(b_code), s_min, e_min))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    custom_windows = weights.get("maintenance_windows", [])
+    if isinstance(custom_windows, list):
+        for cw in custom_windows:
+            if isinstance(cw, dict) and "block_code" in cw:
+                b_code = str(cw["block_code"])
+                s_min = int(cw.get("start_min", 0))
+                e_min = int(cw.get("end_min", HORIZON))
+                closed_blocks.add(b_code)
+                maintenance_windows.append((b_code, s_min, e_min))
+
     baseline_conflicts = detect_all(trains_dicts, stop_dicts, section_dicts, block_dicts,
                                     closed_blocks=closed_blocks, use_revised=False)
 
@@ -245,10 +301,29 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
                 hw_iv = model.new_fixed_size_interval_var(blk_entry, hw, f"hwiv_{tn}_{blk_key}")
                 headway_intervals.setdefault((blk_key, direction), []).append(hw_iv)
 
-    # 1. NoOverlap on single-track blocks (exclusive resource)
+    # Inject hard maintenance closure intervals
+    for b_code, s_min, e_min in maintenance_windows:
+        if s_min >= HORIZON:
+            continue
+        cl_start = max(0, min(HORIZON - 1, s_min))
+        cl_end = max(cl_start + 1, min(HORIZON, e_min))
+        dur = cl_end - cl_start
+
+        # Target matching block keys (single track raw code or double track UP/DOWN)
+        matching_keys = [k for k in block_intervals if k == b_code or k.startswith(f"{b_code}-")]
+        if not matching_keys:
+            matching_keys = [b_code]
+        for k in matching_keys:
+            m_iv = model.new_fixed_size_interval_var(cl_start, dur, f"maint_close_{k}_{cl_start}")
+            block_intervals.setdefault(k, []).append(m_iv)
+
+    # 1. NoOverlap on single-track blocks and maintenance closures
     for blk_key, ivs in block_intervals.items():
-        if len(ivs) > 1 and not blk_key.endswith("-UP") and not blk_key.endswith("-DOWN"):
-            model.add_no_overlap(ivs)
+        if len(ivs) > 1:
+            has_maint = any(iv.name.startswith("maint_close_") for iv in ivs)
+            is_single_track = not blk_key.endswith("-UP") and not blk_key.endswith("-DOWN")
+            if is_single_track or has_maint:
+                model.add_no_overlap(ivs)
 
     # 2. NoOverlap on same-direction headway intervals across all blocks
     for (blk_key, dirn), hw_ivs in headway_intervals.items():
