@@ -133,7 +133,10 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
     # Store entry variables per block to record revised schedule
     block_entry_records: list[dict[str, Any]] = []
 
-    objective_terms: list[cp_model.LinearExpr] = []
+    # Track station platform dwell intervals
+    station_dwell_intervals: dict[str, list[cp_model.IntervalVar]] = {}
+    # Track single-track section traversals for opposing movement deadlock prevention
+    section_traversals: dict[tuple[str, str], list[dict[str, Any]]] = {}
 
     for t in trains_raw:
         tn = t.train_number
@@ -147,6 +150,7 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
             p_arr = st.planned_arrival_min if st.planned_arrival_min is not None else st.planned_departure_min or 0
             p_dep = st.planned_departure_min if st.planned_departure_min is not None else st.planned_arrival_min or 0
             dwell = max(1, st.dwell_min if st.dwell_min is not None else 2)
+            stn_code = station_map.get(st.station_id, "")
 
             # Bounded arrival and departure variables [planned, planned + max_delay]
             av = model.new_int_var(p_arr, p_arr + max_delay, f"arr_{tn}_{i}")
@@ -158,9 +162,20 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
             model.add_hint(av, p_arr)
             model.add_hint(dv, p_dep)
 
-            # Minimum dwell constraint
+            # Minimum dwell & platform capacity constraint
             if i > 0 and i < len(stops) - 1:
-                model.add(dv >= av + dwell)
+                dwell_dur = model.new_int_var(dwell, max_delay + dwell, f"ddur_{tn}_{i}")
+                model.add(dv == av + dwell_dur)
+                dwell_iv = model.new_interval_var(av, dwell_dur, dv, f"stn_iv_{tn}_{stn_code}_{i}")
+                station_dwell_intervals.setdefault(stn_code, []).append(dwell_iv)
+            elif i == 0:
+                orig_start = model.new_int_var(0, HORIZON, f"orig_start_{tn}")
+                model.add_max_equality(orig_start, [dv - dwell, 0])
+                orig_iv = model.new_fixed_size_interval_var(orig_start, dwell, f"orig_iv_{tn}_{stn_code}")
+                station_dwell_intervals.setdefault(stn_code, []).append(orig_iv)
+            else:
+                term_iv = model.new_fixed_size_interval_var(av, dwell, f"term_iv_{tn}_{stn_code}_{i}")
+                station_dwell_intervals.setdefault(stn_code, []).append(term_iv)
 
             # Objective: penalize timetable departure shift
             objective_terms.append(int(change_w * 10) * (dv - p_dep))
@@ -201,6 +216,19 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
             # Travel continuity: arrival at next station = departure from current + section time
             model.add(nxt_arr == cur_dep + total_section_time)
 
+            # Collect traversals for single-track opposing movement exclusion
+            if not is_dt:
+                canon_sec = tuple(sorted([from_st, to_st]))
+                section_traversals.setdefault(canon_sec, []).append({
+                    "tn": tn,
+                    "from_st": from_st,
+                    "to_st": to_st,
+                    "dep": cur_dep,
+                    "arr": nxt_arr,
+                    "planned_dep": stops[i].planned_departure_min or 0,
+                    "planned_arr": stops[i + 1].planned_arrival_min or 0,
+                })
+
             # Create block interval variables
             for blk, dur, offset in block_traversals:
                 raw_code = blk["code"]
@@ -226,6 +254,33 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
     for (blk_key, dirn), hw_ivs in headway_intervals.items():
         if len(hw_ivs) > 1:
             model.add_no_overlap(hw_ivs)
+
+    # 3. Cumulative station platform and passing loop capacity constraints
+    station_capacity = {
+        s.code: max(1, (s.platform_count or 1) + (1 if s.has_passing_loop else 0))
+        for s in db.query(Station).all()
+    }
+    for stn_code, ivs in station_dwell_intervals.items():
+        cap = station_capacity.get(stn_code, 1)
+        if len(ivs) > cap:
+            model.add_cumulative(ivs, [1] * len(ivs), cap)
+
+    # 4. Single-track opposing movement exclusion (meet-and-pass at loop stations only)
+    for canon_sec, travs in section_traversals.items():
+        for idx_a in range(len(travs)):
+            for idx_b in range(idx_a + 1, len(travs)):
+                ta = travs[idx_a]
+                tb = travs[idx_b]
+                # Only constrain if traveling in OPPOSITE directions
+                if ta["from_st"] == tb["to_st"] and ta["to_st"] == tb["from_st"]:
+                    b_opp = model.new_bool_var(f"opp_{canon_sec[0]}_{canon_sec[1]}_{ta['tn']}_{tb['tn']}")
+                    model.add(ta["arr"] <= tb["dep"]).only_enforce_if(b_opp)
+                    model.add(tb["arr"] <= ta["dep"]).only_enforce_if(b_opp.negated())
+
+                    if ta["planned_arr"] <= tb["planned_dep"]:
+                        model.add_hint(b_opp, 1)
+                    else:
+                        model.add_hint(b_opp, 0)
 
     # Objective minimization
     if objective_terms:
