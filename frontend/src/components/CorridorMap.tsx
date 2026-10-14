@@ -93,7 +93,7 @@ const CorridorMapComponent: React.FC<CorridorMapProps> = ({
       {/* Top Controls & Status Legend */}
       <div className="glass-panel" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div>
-          <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.2rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 650, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>Corridor Schematic & Dynamic Block Visualizer</span>
             <span className="provenance-tag provenance-assumed">ASSUMED BLOCKS (2/SECTION)</span>
           </h2>
@@ -232,11 +232,11 @@ const CorridorMapComponent: React.FC<CorridorMapProps> = ({
                   {/* Inter-station Track Blocks (Up & Down lines) */}
                   {!isLast && nextStation && (
                     <div style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', width: 68, textTransform: 'uppercase', fontWeight: 600 }}>
-                          Section Tracks
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: 68, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
+                          Tracks
                         </span>
-                        <div style={{ flex: 1, display: 'flex', gap: 10 }}>
+                        <div className="horizontal-scroll-container" style={{ flex: 1, display: 'flex', gap: 10, minWidth: 0, paddingBottom: 2 }}>
                           {interBlocks.map((blk) => {
                             const simBlk = simBlocks[blk.code];
                             const blockColor = getBlockColor(blk.code);

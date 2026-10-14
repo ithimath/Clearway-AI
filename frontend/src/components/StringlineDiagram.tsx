@@ -104,18 +104,6 @@ const StringlineDiagramComponent: React.FC<StringlineDiagramProps> = ({
     return { stationsWithDistance: res, totalCorridorDistance: Math.max(cumDist, 1) };
   }, [corridorStations, network]);
 
-  if (!network || !network.stations || network.stations.length === 0) {
-    return (
-      <div className="glass-panel" style={{ padding: 48, textAlign: 'center' }}>
-        <Clock size={32} color="var(--accent-cyan)" style={{ margin: '0 auto 12px' }} />
-        <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)' }}>Loading Railway Infrastructure…</h3>
-        <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-          Fetching station topology, interstation distances, and block sections.
-        </p>
-      </div>
-    );
-  }
-
   // Dimensions
   const width = Math.max(1200, (timeEnd - timeStart) * 1.55);
   const height = 580;
@@ -281,6 +269,18 @@ const StringlineDiagramComponent: React.FC<StringlineDiagramProps> = ({
       .filter(Boolean);
   }, [conflicts, timeStart, timeEnd, timeToX, corridorStationCodes, stationToY, selectedConflictId]);
 
+  if (!network || !network.stations || network.stations.length === 0) {
+    return (
+      <div className="glass-panel" style={{ padding: 48, textAlign: 'center' }}>
+        <Clock size={32} color="var(--accent-cyan)" style={{ margin: '0 auto 12px' }} />
+        <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)' }}>Loading Railway Infrastructure…</h3>
+        <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          Fetching station topology, interstation distances, and block sections.
+        </p>
+      </div>
+    );
+  }
+
   const currentX = timeToX(currentTimeMin);
 
   return (
@@ -288,7 +288,7 @@ const StringlineDiagramComponent: React.FC<StringlineDiagramProps> = ({
       {/* Header and Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.15rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 650, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>Time–Distance Stringline Trajectory Diagram</span>
             <span className="provenance-tag provenance-derived">MAREY TRAJECTORY PROJECTION</span>
           </h2>

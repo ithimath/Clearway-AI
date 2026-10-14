@@ -96,7 +96,7 @@ const ScheduleOptimizerComponent: React.FC<ScheduleOptimizerProps> = ({
       {/* Header Bar */}
       <div className="glass-panel" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div>
-          <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.2rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 650, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>CP-SAT Mathematical Schedule Optimizer</span>
             <span className="provenance-tag provenance-derived">OR-TOOLS CP-SAT SOLVER</span>
           </h2>
@@ -236,15 +236,15 @@ const ScheduleOptimizerComponent: React.FC<ScheduleOptimizerProps> = ({
           <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 14px', color: 'var(--text-primary)' }}>
             Optimized Dispatch Adjustments
           </h3>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', fontSize: '0.82rem', textAlign: 'left' }}>
+          <div className="table-container-responsive">
+            <table style={{ width: '100%', fontSize: '0.86rem', textAlign: 'left' }}>
               <thead>
                 <tr>
                   <th>Train</th>
                   <th>Station</th>
-                  <th>Planned Dep</th>
-                  <th>Optimized Dep</th>
-                  <th>Delta Delay</th>
+                  <th className="num-col">Planned Dep</th>
+                  <th className="num-col">Optimized Dep</th>
+                  <th className="num-col">Delta Delay</th>
                 </tr>
               </thead>
               <tbody>
@@ -252,12 +252,12 @@ const ScheduleOptimizerComponent: React.FC<ScheduleOptimizerProps> = ({
                   const delay = (st.revised_departure_min || 0) - (st.planned_departure_min || 0);
                   return (
                     <tr key={i}>
-                      <td style={{ fontWeight: 600, color: 'var(--accent-cyan)' }}>{st.train_number}</td>
-                      <td>{st.station_code}</td>
-                      <td>{formatMin(st.planned_departure_min)}</td>
-                      <td style={{ color: 'var(--accent-emerald)', fontWeight: 600 }}>{formatMin(st.revised_departure_min)}</td>
-                      <td>
-                        <span style={{ color: delay > 0 ? 'var(--accent-amber)' : 'var(--accent-emerald)', fontWeight: 600 }}>
+                      <td style={{ fontWeight: 600, color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>{st.train_number}</td>
+                      <td style={{ fontWeight: 500 }}>{st.station_code}</td>
+                      <td className="tabular-nums num-col">{formatMin(st.planned_departure_min)}</td>
+                      <td className="tabular-nums num-col" style={{ color: 'var(--accent-emerald)', fontWeight: 600 }}>{formatMin(st.revised_departure_min)}</td>
+                      <td className="num-col">
+                        <span className="tabular-nums" style={{ color: delay > 0 ? 'var(--accent-amber)' : 'var(--accent-emerald)', fontWeight: 600 }}>
                           {delay > 0 ? `+${delay} min` : '0 min (Exact)'}
                         </span>
                       </td>

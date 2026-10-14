@@ -154,7 +154,7 @@ const ScenarioSandboxComponent: React.FC<ScenarioSandboxProps> = ({
       {/* Header Bar */}
       <div className="glass-panel" style={{ padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div>
-          <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.2rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 650, margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
             <span>What-If Scenario Sandbox & Disruption Modeling</span>
             <span className="provenance-tag provenance-simulated">SIMULATION PERTURBATION</span>
           </h2>
@@ -213,7 +213,7 @@ const ScenarioSandboxComponent: React.FC<ScenarioSandboxProps> = ({
           </h3>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+        <div className="grid-1-col-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 16 }}>
           {presets.map((p, i) => (
             <div
               key={i}
@@ -273,7 +273,7 @@ const ScenarioSandboxComponent: React.FC<ScenarioSandboxProps> = ({
           Configure Custom Scenario Perturbations
         </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20 }}>
+        <div className="grid-1-col-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 20 }}>
           {/* Train Selection */}
           <div>
             <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
@@ -395,7 +395,7 @@ const ScenarioSandboxComponent: React.FC<ScenarioSandboxProps> = ({
           </div>
 
           {/* Real Metrics Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: 16, marginBottom: 20 }}>
             <div style={{ background: 'var(--bg-card-subtle)', padding: 16, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
                 Baseline Conflicts

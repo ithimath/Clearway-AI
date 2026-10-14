@@ -64,7 +64,7 @@ const MaintenancePlannerComponent: React.FC<MaintenancePlannerProps> = ({
       {/* Header Bar */}
       <div className="glass-panel" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div>
-          <h2 style={{ fontFamily: 'Outfit, sans-serif', fontSize: '1.2rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 650, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>Maintenance Window Optimizer & Block Possession Planner</span>
             <span className="provenance-tag provenance-assumed">CP-SAT INTERVAL SCHEDULING</span>
           </h2>
@@ -129,7 +129,7 @@ const MaintenancePlannerComponent: React.FC<MaintenancePlannerProps> = ({
             </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+          <div className="grid-1-col-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 16 }}>
             {jobs.map((job, idx) => {
               const isScheduled = job.status === 'scheduled';
 

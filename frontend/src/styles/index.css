@@ -1,5 +1,4 @@
 /* Clearway AI — Modern Railway Design System: Burgundy + Rose Gold Palette */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
 
 :root {
   /* Burgundy + Rose Gold Dark Mode Theme */
@@ -21,9 +20,10 @@
   --border-medium: #624251;
   --border-bright: #D9778A;
 
+  /* High-Contrast WCAG AA Text Colors */
   --text-primary: #FFF4F5;
-  --text-secondary: #BCA6AD;
-  --text-muted: #8E7780;
+  --text-secondary: #C8B5BC;
+  --text-muted: #A38F97;
   --text-inverse: #190F16;
 
   /* Burgundy & Rose Gold Accents */
@@ -62,10 +62,17 @@
   --state-closed: #f43f5e;
   --state-conflicted: #f43f5e;
 
-  /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Outfit', var(--font-sans);
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Typography Design Tokens */
+  --font-sans: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Manrope', var(--font-sans);
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Type Scale Tokens */
+  --font-size-page-heading: 26px;
+  --font-size-section-heading: 19px;
+  --font-size-card-title: 15.5px;
+  --font-size-body: 14.5px;
+  --font-size-secondary: 12.5px;
 
   /* Radii & Shadows */
   --radius-xs: 4px;
@@ -85,7 +92,7 @@
   /* SVG & Chart elements */
   --chart-grid: rgba(217, 119, 138, 0.12);
   --chart-grid-hour: rgba(217, 119, 138, 0.24);
-  --chart-text: #BCA6AD;
+  --chart-text: #C8B5BC;
   --chart-station-text: #FFF4F5;
   --chart-bg: #190F16;
 }
@@ -110,9 +117,10 @@
   --border-medium: #D8BFC8;
   --border-bright: #A83F5D;
 
+  /* High-Contrast WCAG AA Light Mode Text */
   --text-primary: #34212A;
-  --text-secondary: #725C65;
-  --text-muted: #806B74;
+  --text-secondary: #5C4751;
+  --text-muted: #6B555F;
   --text-inverse: #FFFFFF;
 
   /* Rich Burgundy & Rose Gold Accents */
@@ -124,12 +132,11 @@
   --accent-secondary-subtle: rgba(183, 110, 121, 0.12);
   --accent-secondary-glow: rgba(183, 110, 121, 0.25);
 
-  /* Primary interface highlight */
   --accent-cyan: #A83F5D;
   --accent-cyan-subtle: rgba(168, 63, 93, 0.12);
   --accent-cyan-glow: rgba(168, 63, 93, 0.25);
 
-  /* Status Colors with WCAG Contrast in Light Mode */
+  /* Status Colors with WCAG AA Contrast in Light Mode */
   --accent-emerald: #15803d;
   --accent-emerald-subtle: rgba(21, 128, 61, 0.12);
   --accent-emerald-glow: rgba(21, 128, 61, 0.25);
@@ -161,7 +168,7 @@
   /* SVG & Chart elements in Light Mode */
   --chart-grid: rgba(168, 63, 93, 0.12);
   --chart-grid-hour: rgba(168, 63, 93, 0.22);
-  --chart-text: #725C65;
+  --chart-text: #5C4751;
   --chart-station-text: #34212A;
   --chart-bg: #FFFFFF;
 }
@@ -176,12 +183,73 @@ body {
   background-color: var(--bg-deep);
   color: var(--text-primary);
   font-family: var(--font-sans);
+  font-size: var(--font-size-body);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   min-height: 100vh;
   transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Headings scale */
+h1, .page-heading {
+  font-family: var(--font-display);
+  font-size: var(--font-size-page-heading);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+h2, .section-heading {
+  font-family: var(--font-display);
+  font-size: var(--font-size-section-heading);
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+h3, h4, .card-title {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-card-title);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Secondary labels */
+.secondary-label, .text-secondary-label {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-secondary);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* Tabular numerals for clocks, tables, KPI numbers */
+.tabular-nums,
+.clock-time,
+.kpi-number,
+.num-col,
+[data-numeric="true"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Right alignment for numeric table columns */
+.num-col, th.num-col, td.num-col {
+  text-align: right;
+}
+
+/* Truncation utility */
+.truncate-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Technical code & identifiers */
+.mono-val, .tech-id {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Glassmorphism panel styling */
@@ -217,13 +285,13 @@ body {
   padding: 3px 8px;
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.75rem; /* >= 12px for accessibility */
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.04em; /* <= 0.04em per guidelines */
   text-transform: uppercase;
 }
 
-.provenance-real {
+.provenance-real, .provenance-observed {
   background: var(--accent-cyan-subtle);
   color: var(--accent-primary);
   border: 1px solid var(--accent-primary);
@@ -262,7 +330,7 @@ body {
   padding: 8px 16px;
   border-radius: var(--radius-md);
   font-weight: 500;
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   cursor: pointer;
   border: 1px solid transparent;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -415,11 +483,12 @@ body {
   background: transparent;
   color: var(--text-secondary);
   border: none;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  font-family: var(--font-sans);
 }
 
 .nav-tab-btn:hover {
@@ -450,8 +519,8 @@ body {
 
 /* Theme Toggle Button */
 .theme-toggle-btn {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
   background: var(--bg-card-subtle);
   border: 1px solid var(--border-subtle);
@@ -469,6 +538,25 @@ body {
   transform: rotate(15deg);
 }
 
+/* Mobile Nav Toggle Button */
+.mobile-nav-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-subtle);
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* Mobile Nav Drawer */
+.mobile-nav-drawer {
+  display: none;
+}
+
 /* Form inputs & selects */
 input[type="text"],
 input[type="number"],
@@ -479,7 +567,7 @@ textarea {
   color: var(--text-primary);
   border-radius: var(--radius-sm);
   padding: 8px 12px;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-family: var(--font-sans);
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
@@ -500,6 +588,12 @@ select option {
 }
 
 /* Tables */
+.table-container-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -509,15 +603,15 @@ th {
   color: var(--text-muted);
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
+  font-size: 0.75rem; /* >= 12px for WCAG readability */
+  letter-spacing: 0.04em;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 td {
   padding: 12px 14px;
-  font-size: 0.84rem;
+  font-size: 0.86rem;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -527,7 +621,7 @@ td {
   background: var(--bg-footer);
   border-top: 1px solid var(--border-subtle);
   padding: 18px 32px;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--text-muted);
   display: flex;
   flex-direction: column;
@@ -537,7 +631,33 @@ td {
   transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
-/* Responsive queries */
+/* Horizontal scrollable track diagrams */
+.horizontal-scroll-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* -------------------------------------------------------------
+   TABLET RESPONSIVE STEP (768px - 1023px)
+   Keeps desktop layout intact while adapting to tablet screen
+   ------------------------------------------------------------- */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .main-content {
+    padding: 18px 24px 36px;
+  }
+  .header-bar {
+    padding: 12px 24px;
+  }
+  .conflict-radar-grid {
+    grid-template-columns: 320px 1fr !important;
+  }
+}
+
+/* -------------------------------------------------------------
+   LAPTOP / DESKTOP RESPONSIVE TWEAKS (1024px+)
+   Preserves existing desktop experience exactly
+   ------------------------------------------------------------- */
 @media (max-width: 1024px) {
   .main-content {
     padding: 16px 20px 36px;
@@ -547,14 +667,193 @@ td {
   }
 }
 
-@media (max-width: 768px) {
+/* -------------------------------------------------------------
+   MOBILE COMPACTNESS (Below 768px ONLY)
+   Strictly scoped to < 768px. Desktop styles are never altered.
+   ------------------------------------------------------------- */
+@media (max-width: 767px) {
+  /* Safe area and compact outer spacing */
+  .main-content {
+    padding: 12px 14px 28px !important;
+    padding-left: max(14px, env(safe-area-inset-left)) !important;
+    padding-right: max(14px, env(safe-area-inset-right)) !important;
+  }
+
+  .header-bar {
+    padding: 10px 14px !important;
+    padding-top: max(10px, env(safe-area-inset-top)) !important;
+    padding-left: max(14px, env(safe-area-inset-left)) !important;
+    padding-right: max(14px, env(safe-area-inset-right)) !important;
+  }
+
+  .footer-banner {
+    padding: 14px 14px !important;
+    padding-bottom: max(18px, env(safe-area-inset-bottom)) !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Compact card padding: 12px */
+  .glass-panel {
+    padding: 12px !important;
+  }
+
+  /* Vertical gaps: 12px */
+  .mobile-gap-12 {
+    gap: 12px !important;
+  }
+
+  /* Typography scale on mobile */
+  h1, .page-heading {
+    font-size: 23px !important;
+  }
+
+  h2, .section-heading {
+    font-size: 17.5px !important;
+  }
+
+  body, p {
+    font-size: 14px !important;
+  }
+
+  .secondary-label {
+    font-size: 12px !important;
+  }
+
+  /* Header controls stacking */
   .header-top-row {
     flex-direction: column;
-    align-items: flex-start !important;
-    gap: 12px;
+    align-items: stretch !important;
+    gap: 12px !important;
   }
-  .clock-widget {
-    width: 100%;
+
+  .header-brand-row {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
+    width: 100%;
+  }
+
+  .header-controls-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .clock-widget {
+    width: 100% !important;
+    justify-content: space-between !important;
+    padding: 8px 12px !important;
+  }
+
+  /* Navigation: Collapse horizontal bar into toggleable drawer */
+  .nav-tabs.desktop-nav-tabs {
+    display: none !important;
+  }
+
+  .mobile-nav-toggle {
+    display: inline-flex !important;
+  }
+
+  .mobile-nav-drawer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    margin-top: 10px;
+    box-shadow: var(--shadow-md);
+  }
+
+  .mobile-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px; /* Accessible tap target >= 44px */
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    text-align: left;
+    width: 100%;
+  }
+
+  .mobile-nav-btn.active {
+    background: var(--bg-card);
+    border-color: var(--border-bright);
+    color: var(--accent-primary);
+    font-weight: 600;
+  }
+
+  /* Tap targets for buttons >= 44px */
+  button, .btn, .theme-toggle-btn {
+    min-height: 44px;
+  }
+
+  /* Controls & forms: 16px font size to prevent iOS zoom */
+  input[type="text"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important;
+    width: 100% !important;
+    min-height: 44px;
+  }
+
+  /* Grids: Stack into 1 column (KPI cards can be 2 columns) */
+  .conflict-radar-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .grid-1-col-mobile {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tables: Horizontal scroll with sticky first column */
+  .table-container-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    margin: 0;
+  }
+
+  table {
+    min-width: 500px;
+  }
+
+  th, td {
+    font-size: 13px !important;
+    padding: 10px 10px !important;
+  }
+
+  th:first-child, td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--bg-surface);
+    z-index: 2;
+  }
+
+  /* Button groups stacking */
+  .btn-group-mobile {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .btn-group-mobile .btn {
+    width: 100%;
   }
 }

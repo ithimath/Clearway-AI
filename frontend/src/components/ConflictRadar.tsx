@@ -195,9 +195,9 @@ const ConflictRadarComponent: React.FC<ConflictRadarProps> = ({
         <div>
           <h2
             style={{
-              fontFamily: 'Outfit, sans-serif',
-              fontSize: '1.18rem',
-              fontWeight: 600,
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.2rem',
+              fontWeight: 650,
               margin: 0,
               display: 'flex',
               alignItems: 'center',
@@ -235,7 +235,7 @@ const ConflictRadarComponent: React.FC<ConflictRadarProps> = ({
       </div>
 
       {/* Summary Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16 }}>
+      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16 }}>
         <div
           className="glass-panel interactive-card"
           style={{
@@ -246,13 +246,13 @@ const ConflictRadarComponent: React.FC<ConflictRadarProps> = ({
           }}
           onClick={() => setSeverityFilter('all')}
         >
-          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
             Total Detected Conflicts
           </div>
-          <div style={{ fontSize: '1.7rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: 4 }}>
+          <div className="tabular-nums" style={{ fontSize: '1.7rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: 4 }}>
             {conflicts.length}
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
             {conflicts.length === 0 ? 'Network is conflict-free' : 'Across corridor schedule'}
           </div>
         </div>
@@ -267,13 +267,13 @@ const ConflictRadarComponent: React.FC<ConflictRadarProps> = ({
           }}
           onClick={() => setSeverityFilter('critical')}
         >
-          <div style={{ fontSize: '0.74rem', color: '#f43f5e', textTransform: 'uppercase', fontWeight: 600 }}>
+          <div style={{ fontSize: '0.75rem', color: '#f43f5e', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
             Critical Safety Violations
           </div>
-          <div style={{ fontSize: '1.7rem', fontWeight: 700, color: '#f43f5e', marginTop: 4 }}>
+          <div className="tabular-nums" style={{ fontSize: '1.7rem', fontWeight: 700, color: '#f43f5e', marginTop: 4 }}>
             {criticalCount}
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
             Single-track opposing / block overlaps
           </div>
         </div>
@@ -288,13 +288,13 @@ const ConflictRadarComponent: React.FC<ConflictRadarProps> = ({
           }}
           onClick={() => setSeverityFilter('major')}
         >
-          <div style={{ fontSize: '0.74rem', color: '#f59e0b', textTransform: 'uppercase', fontWeight: 600 }}>
+          <div style={{ fontSize: '0.75rem', color: '#f59e0b', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
             Major Headway Issues
           </div>
-          <div style={{ fontSize: '1.7rem', fontWeight: 700, color: '#f59e0b', marginTop: 4 }}>
+          <div className="tabular-nums" style={{ fontSize: '1.7rem', fontWeight: 700, color: '#f59e0b', marginTop: 4 }}>
             {majorCount}
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
             Below minimum block headway
           </div>
         </div>
@@ -309,35 +309,35 @@ const ConflictRadarComponent: React.FC<ConflictRadarProps> = ({
           }}
           onClick={() => setSeverityFilter('minor')}
         >
-          <div style={{ fontSize: '0.74rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 600 }}>
+          <div style={{ fontSize: '0.75rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
             Minor / Junction Alerts
           </div>
-          <div style={{ fontSize: '1.7rem', fontWeight: 700, color: '#38bdf8', marginTop: 4 }}>
+          <div className="tabular-nums" style={{ fontSize: '1.7rem', fontWeight: 700, color: '#38bdf8', marginTop: 4 }}>
             {minorCount}
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
             Junction clearance & dwell warnings
           </div>
         </div>
       </div>
 
       {/* Main Radar Layout: Radar Scope + Conflict Feed + Inspector */}
-      <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 20 }}>
+      <div className="conflict-radar-grid" style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 20 }}>
         {/* Radar Scope Column */}
         <div className="glass-panel" style={{ padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: 10, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', fontWeight: 600 }}>
               <Compass size={15} color="var(--accent-cyan)" />
               <span>Spatial Radar Scope</span>
             </div>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               Angle = Time · Ring = Severity
             </span>
           </div>
 
           {/* SVG Radar Display */}
-          <div style={{ position: 'relative', width: radarSize, height: radarSize }}>
-            <svg width={radarSize} height={radarSize} style={{ display: 'block' }}>
+          <div style={{ position: 'relative', width: '100%', maxWidth: radarSize, aspectRatio: '1 / 1', display: 'flex', justifyContent: 'center' }}>
+            <svg viewBox={`0 0 ${radarSize} ${radarSize}`} style={{ width: '100%', height: '100%', display: 'block' }}>
               {/* Radar Background circle */}
               <circle cx={radarCenter} cy={radarCenter} r={radarRadius} fill="#060c18" stroke="#1e293b" strokeWidth="1.5" />
 
@@ -347,13 +347,13 @@ const ConflictRadarComponent: React.FC<ConflictRadarProps> = ({
               <circle cx={radarCenter} cy={radarCenter} r={radarRadius * 0.88} fill="none" stroke="rgba(56, 189, 248, 0.15)" strokeDasharray="3,3" />
 
               {/* Ring Labels */}
-              <text x={radarCenter} y={radarCenter - radarRadius * 0.4 + 11} fill="rgba(244, 63, 94, 0.7)" fontSize="8" textAnchor="middle" fontFamily="JetBrains Mono">
+              <text x={radarCenter} y={radarCenter - radarRadius * 0.4 + 11} fill="rgba(244, 63, 94, 0.7)" fontSize="8" textAnchor="middle" fontFamily="var(--font-mono)">
                 CRITICAL ZONE
               </text>
-              <text x={radarCenter} y={radarCenter - radarRadius * 0.65 + 11} fill="rgba(245, 158, 11, 0.7)" fontSize="8" textAnchor="middle" fontFamily="JetBrains Mono">
+              <text x={radarCenter} y={radarCenter - radarRadius * 0.65 + 11} fill="rgba(245, 158, 11, 0.7)" fontSize="8" textAnchor="middle" fontFamily="var(--font-mono)">
                 MAJOR ZONE
               </text>
-              <text x={radarCenter} y={radarCenter - radarRadius * 0.88 + 11} fill="rgba(56, 189, 248, 0.7)" fontSize="8" textAnchor="middle" fontFamily="JetBrains Mono">
+              <text x={radarCenter} y={radarCenter - radarRadius * 0.88 + 11} fill="rgba(56, 189, 248, 0.7)" fontSize="8" textAnchor="middle" fontFamily="var(--font-mono)">
                 MINOR ZONE
               </text>
 
@@ -362,10 +362,10 @@ const ConflictRadarComponent: React.FC<ConflictRadarProps> = ({
               <line x1={20} y1={radarCenter} x2={radarSize - 20} y2={radarCenter} stroke="var(--chart-grid)" />
 
               {/* Direction Time Labels */}
-              <text x={radarCenter} y={15} fill="var(--text-muted)" fontSize="9" textAnchor="middle" fontFamily="JetBrains Mono">05:00</text>
-              <text x={radarSize - 12} y={radarCenter + 3} fill="var(--text-muted)" fontSize="9" textAnchor="end" fontFamily="JetBrains Mono">09:00</text>
-              <text x={radarCenter} y={radarSize - 6} fill="var(--text-muted)" fontSize="9" textAnchor="middle" fontFamily="JetBrains Mono">14:00</text>
-              <text x={12} y={radarCenter + 3} fill="var(--text-muted)" fontSize="9" textAnchor="start" fontFamily="JetBrains Mono">20:00</text>
+              <text x={radarCenter} y={15} fill="var(--text-muted)" fontSize="9" textAnchor="middle" fontFamily="var(--font-mono)">05:00</text>
+              <text x={radarSize - 12} y={radarCenter + 3} fill="var(--text-muted)" fontSize="9" textAnchor="end" fontFamily="var(--font-mono)">09:00</text>
+              <text x={radarCenter} y={radarSize - 6} fill="var(--text-muted)" fontSize="9" textAnchor="middle" fontFamily="var(--font-mono)">14:00</text>
+              <text x={12} y={radarCenter + 3} fill="var(--text-muted)" fontSize="9" textAnchor="start" fontFamily="var(--font-mono)">20:00</text>
 
               {/* Sweeping Radar Beam Animation */}
               <g transform={`rotate(45, ${radarCenter}, ${radarCenter})`}>

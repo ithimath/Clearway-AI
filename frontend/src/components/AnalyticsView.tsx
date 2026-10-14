@@ -39,7 +39,7 @@ const AnalyticsViewComponent: React.FC<AnalyticsViewProps> = ({ metrics }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* KPI Cards Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
         <div className="glass-panel interactive-card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
@@ -47,7 +47,7 @@ const AnalyticsViewComponent: React.FC<AnalyticsViewProps> = ({ metrics }) => {
             </span>
             <Train size={18} color="var(--accent-cyan)" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: 8 }}>
+          <div className="tabular-nums" style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: 8 }}>
             {metrics?.trains.active ?? 12} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>/ {metrics?.trains.total ?? 12}</span>
           </div>
           <div style={{ marginTop: 8 }}>
@@ -62,7 +62,7 @@ const AnalyticsViewComponent: React.FC<AnalyticsViewProps> = ({ metrics }) => {
             </span>
             <Layers size={18} color="var(--accent-emerald)" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-emerald)', marginTop: 8 }}>
+          <div className="tabular-nums" style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-emerald)', marginTop: 8 }}>
             {metrics?.blocks.available ?? 18} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>/ {metrics?.blocks.total ?? 20}</span>
           </div>
           <div style={{ marginTop: 8 }}>
@@ -77,7 +77,7 @@ const AnalyticsViewComponent: React.FC<AnalyticsViewProps> = ({ metrics }) => {
             </span>
             <ShieldCheck size={18} color="var(--accent-emerald)" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-emerald)', marginTop: 8 }}>
+          <div className="tabular-nums" style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-emerald)', marginTop: 8 }}>
             {metrics?.delays.on_time_pct ?? 100.0}%
           </div>
           <div style={{ marginTop: 8 }}>
@@ -92,7 +92,7 @@ const AnalyticsViewComponent: React.FC<AnalyticsViewProps> = ({ metrics }) => {
             </span>
             <BarChart3 size={18} color="var(--accent-amber)" />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-amber)', marginTop: 8 }}>
+          <div className="tabular-nums" style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-amber)', marginTop: 8 }}>
             {metrics?.delays.avg_min ?? 0.0} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>mins</span>
           </div>
           <div style={{ marginTop: 8 }}>
@@ -102,7 +102,7 @@ const AnalyticsViewComponent: React.FC<AnalyticsViewProps> = ({ metrics }) => {
       </div>
 
       {/* Provenance Matrix & Export Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
+      <div className="grid-1-col-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 20 }}>
         {/* Provenance Ledger */}
         <div className="glass-panel" style={{ padding: 22 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -115,8 +115,8 @@ const AnalyticsViewComponent: React.FC<AnalyticsViewProps> = ({ metrics }) => {
             Every data entity in Clearway AI is classified by source authenticity to ensure research transparency.
           </p>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', fontSize: '0.82rem' }}>
+          <div className="table-container-responsive">
+            <table style={{ width: '100%', fontSize: '0.86rem' }}>
               <thead>
                 <tr>
                   <th>Data Entity</th>
