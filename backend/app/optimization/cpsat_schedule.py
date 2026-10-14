@@ -244,8 +244,9 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
                 term_iv = model.new_fixed_size_interval_var(av, dwell, f"term_iv_{tn}_{stn_code}_{i}")
                 station_dwell_intervals.setdefault(stn_code, []).append(term_iv)
 
-            # Objective: penalize timetable departure shift
-            objective_terms.append(int(change_w * 10) * (dv - p_dep))
+            # Objective: penalize timetable departure shift only for intermediate and origin departures
+            if i < len(stops) - 1:
+                objective_terms.append(int(change_w * 10) * (dv - p_dep))
 
         # Objective: priority-weighted arrival delay at final terminus
         final_idx = len(stops) - 1
@@ -264,18 +265,25 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
             hw = section_hw.get((from_st, to_st), 5)
             is_dt = section_dt.get((from_st, to_st), False)
 
-            # Determine blocks for section
-            sec_blocks = [b for b in block_dicts if (
-                (b["section_from"] == from_st and b["section_to"] == to_st) or
-                (b["section_from"] == to_st and b["section_to"] == from_st)
-            )]
-            sec_blocks.sort(key=lambda b: b["block_index"])
+            # Determine blocks for section with directional reversal
+            is_reversed = False
+            sec_blocks = [b for b in block_dicts if (b["section_from"] == from_st and b["section_to"] == to_st)]
+            if not sec_blocks:
+                sec_blocks = [b for b in block_dicts if (b["section_from"] == to_st and b["section_to"] == from_st)]
+                is_reversed = True
 
-            # Traverse time across blocks
+            sec_blocks.sort(key=lambda b: b["block_index"])
+            if is_reversed:
+                sec_blocks = list(reversed(sec_blocks))
+
+            # Traverse time across blocks: exact integer partition of rt
             cum_traverse = 0
             block_traversals = []
-            for blk in sec_blocks:
-                dur = max(1, round(rt * blk["time_fraction"]))
+            for idx_b, blk in enumerate(sec_blocks):
+                if idx_b == len(sec_blocks) - 1:
+                    dur = max(1, rt - cum_traverse)
+                else:
+                    dur = max(1, round(rt * blk["time_fraction"]))
                 block_traversals.append((blk, dur, cum_traverse))
                 cum_traverse += dur
 
@@ -436,6 +444,25 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
 
         post_conflicts = detect_all(trains_dicts, revised_stop_dicts, section_dicts, block_dicts,
                                     closed_blocks=maintenance_windows, use_revised=True)
+
+        # Synchronize ConflictRecord table so Conflict Radar and Stringline reflect verified state
+        from app.models.conflicts import ConflictRecord
+        db.query(ConflictRecord).filter(ConflictRecord.context == "baseline").delete()
+        for pc in post_conflicts:
+            db.add(ConflictRecord(
+                conflict_uid=pc.conflict_uid,
+                conflict_type=pc.conflict_type.value if hasattr(pc.conflict_type, "value") else str(pc.conflict_type),
+                severity=pc.severity.value if hasattr(pc.severity, "value") else str(pc.severity),
+                trains_json=json.dumps(pc.trains),
+                resource_code=pc.resource_code,
+                interval_start_min=pc.interval_start_min,
+                interval_end_min=pc.interval_end_min,
+                explanation=pc.explanation,
+                rule_source=pc.rule_source,
+                suggested_actions_json=json.dumps(pc.suggested_actions),
+                context="baseline",
+            ))
+        db.commit()
 
         # Run independent verification engine (plain Python, no OR-Tools)
         from app.domain.verifier import verify_schedule_integrity

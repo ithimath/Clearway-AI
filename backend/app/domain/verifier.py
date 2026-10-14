@@ -154,9 +154,14 @@ def compute_independent_block_occupancies(
                 blks = list(reversed(blks))
 
             curr_t = dep_min
-            for b in blks:
-                tf = b.get("time_fraction", 1.0 / len(blks))
-                dur = max(1, round(rt * tf))
+            cum_traverse = 0
+            for idx_b, b in enumerate(blks):
+                if idx_b == len(blks) - 1:
+                    dur = max(1, rt - cum_traverse)
+                else:
+                    tf = b.get("time_fraction", 1.0 / len(blks))
+                    dur = max(1, round(rt * tf))
+                cum_traverse += dur
                 raw_code = b["code"]
                 # Directional key on double track, shared physical key on single track
                 blk_key = raw_code if not is_dt else f"{raw_code}-{direction}"

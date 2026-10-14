@@ -45,6 +45,8 @@ def list_trains(
         dest = station_map.get(stops[-1].station_id, "") if stops else ""
         dep = stops[0].planned_departure_min if stops else None
         arr = stops[-1].planned_arrival_min if stops else None
+        rev_dep = stops[0].revised_departure_min if stops else None
+        rev_arr = stops[-1].revised_arrival_min if stops else None
         stop_list = [
             {
                 "id": s.id,
@@ -75,6 +77,8 @@ def list_trains(
                 "destination": dest,
                 "planned_departure_min": dep,
                 "planned_arrival_min": arr,
+                "revised_departure_min": rev_dep,
+                "revised_arrival_min": rev_arr,
                 "stop_count": len(stops),
                 "provenance": t.provenance,
                 "stops": stop_list,

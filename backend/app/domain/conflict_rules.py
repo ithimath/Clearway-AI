@@ -158,8 +158,13 @@ def build_block_occupancy(
 
             is_double = sec.get("is_double_track", False)
             t = dep_min
-            for blk in blks:
-                traverse = max(1, round(rt * blk["time_fraction"]))
+            cum_traverse = 0
+            for idx_b, blk in enumerate(blks):
+                if idx_b == len(blks) - 1:
+                    traverse = max(1, rt - cum_traverse)
+                else:
+                    traverse = max(1, round(rt * blk["time_fraction"]))
+                cum_traverse += traverse
                 win = {
                     "train_number": tn,
                     "direction": direction,

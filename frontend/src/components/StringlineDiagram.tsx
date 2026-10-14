@@ -28,8 +28,13 @@ const StringlineDiagramComponent: React.FC<StringlineDiagramProps> = ({
   const [selectedCorridor, setSelectedCorridor] = useState<CorridorKey>('chennai_madurai_main');
   const [spacingMode, setSpacingMode] = useState<SpacingMode>('distance');
   const [timeWindow, setTimeWindow] = useState<TimeWindowKey>('full');
+  const [scheduleMode, setScheduleMode] = useState<'revised' | 'planned'>('revised');
   const [hoveredTrain, setHoveredTrain] = useState<string | null>(null);
   const [hoveredConflict, setHoveredConflict] = useState<ConflictRecord | null>(null);
+
+  const hasRevised = useMemo(() => {
+    return trains.some((t) => t.stops?.some((s) => s.revised_departure_min !== null && s.revised_departure_min !== undefined));
+  }, [trains]);
 
   // Time window bounds (minutes from midnight)
   const { timeStart, timeEnd } = useMemo(() => {
@@ -185,8 +190,8 @@ const StringlineDiagramComponent: React.FC<StringlineDiagramProps> = ({
           const y = stationToY(st.station_code!);
           if (y === null) continue;
 
-          const arr = st.revised_arrival_min ?? st.planned_arrival_min ?? st.planned_departure_min;
-          const dep = st.revised_departure_min ?? st.planned_departure_min ?? st.planned_arrival_min;
+          const arr = (scheduleMode === 'revised' ? (st.revised_arrival_min ?? st.planned_arrival_min) : st.planned_arrival_min) ?? st.planned_departure_min;
+          const dep = (scheduleMode === 'revised' ? (st.revised_departure_min ?? st.planned_departure_min) : st.planned_departure_min) ?? st.planned_arrival_min;
 
           if (arr !== null && arr !== undefined) {
             points.push({ x: timeToX(arr), y, time: arr, type: 'arr', station: st.station_code! });
@@ -215,7 +220,7 @@ const StringlineDiagramComponent: React.FC<StringlineDiagramProps> = ({
         };
       })
       .filter(Boolean);
-  }, [trains, corridorStationCodes, stationToY, timeToX, selectedConflictTrains]);
+  }, [trains, corridorStationCodes, stationToY, timeToX, selectedConflictTrains, scheduleMode]);
 
   // Position conflict markers on the chart (memoized)
   const conflictMarkers = useMemo(() => {
@@ -288,9 +293,14 @@ const StringlineDiagramComponent: React.FC<StringlineDiagramProps> = ({
       {/* Header and Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 650, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 650, margin: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span>Time–Distance Stringline Trajectory Diagram</span>
             <span className="provenance-tag provenance-derived">MAREY TRAJECTORY PROJECTION</span>
+            {hasRevised && scheduleMode === 'revised' && (
+              <span className="provenance-tag" style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)', border: '1px solid rgba(16, 185, 129, 0.4)', fontWeight: 700 }}>
+                ✓ VERIFIED SCHEDULE
+              </span>
+            )}
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
             Physical train movements across{' '}
@@ -360,7 +370,46 @@ const StringlineDiagramComponent: React.FC<StringlineDiagramProps> = ({
           </select>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          {/* Schedule Mode Toggle */}
+          {hasRevised && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Schedule:</span>
+              <div style={{ display: 'inline-flex', background: 'var(--bg-card-subtle)', borderRadius: 6, padding: 2, border: '1px solid var(--border-subtle)' }}>
+                <button
+                  onClick={() => setScheduleMode('revised')}
+                  style={{
+                    background: scheduleMode === 'revised' ? 'var(--accent-emerald)' : 'transparent',
+                    color: scheduleMode === 'revised' ? '#ffffff' : 'var(--text-secondary)',
+                    border: 'none',
+                    padding: '3px 8px',
+                    borderRadius: 4,
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Verified Revised
+                </button>
+                <button
+                  onClick={() => setScheduleMode('planned')}
+                  style={{
+                    background: scheduleMode === 'planned' ? 'var(--accent-primary)' : 'transparent',
+                    color: scheduleMode === 'planned' ? '#ffffff' : 'var(--text-secondary)',
+                    border: 'none',
+                    padding: '3px 8px',
+                    borderRadius: 4,
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Planned Baseline
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Spacing Mode Toggle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ color: 'var(--text-muted)' }}>Y-Axis Scale:</span>

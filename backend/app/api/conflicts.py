@@ -124,6 +124,13 @@ def list_conflicts(
     if severity:
         q = q.filter(ConflictRecord.severity == severity)
     records = q.order_by(ConflictRecord.detected_at.desc()).all()
+
+    # If no records exist in baseline and no revised schedule is active, auto-initialize live detection
+    if not records and context == "baseline" and not severity:
+        has_revised = db.query(StopTime).filter(StopTime.revised_departure_min.isnot(None)).first() is not None
+        if not has_revised:
+            detect_conflicts(use_revised=False, context="baseline", db=db)
+            records = db.query(ConflictRecord).filter(ConflictRecord.context == context).order_by(ConflictRecord.detected_at.desc()).all()
     return [
         _format_conflict_record(
             conflict_uid=r.conflict_uid,

@@ -23,6 +23,7 @@ from app.models.infrastructure import Block, Station, TrackSection
 from app.models.maintenance import MaintenanceJob, MaintenancePlan
 from app.models.trains import StopTime, Train
 from app.domain.verifier import (
+    ViolationType,
     verify_schedule_integrity,
     verify_block_reservation_overlaps,
     verify_headway_separation,
@@ -373,3 +374,141 @@ def test_regression_scenario_6_never_relax_hard_constraint(mem_db: Session):
     # With closed block and single route, schedule MUST be INFEASIBLE
     res = optimize_schedule(mem_db, {"time_limit_s": 3.0})
     assert res["solver_status"] == "INFEASIBLE"
+
+
+def test_verifier_detects_and_rejects_overlapping_trains():
+    """Independent verifier must detect and reject overlapping train occupancies on exclusive blocks."""
+    trains = [
+        {"train_number": "T1", "direction": "down", "priority": 1},
+        {"train_number": "T2", "direction": "down", "priority": 2},
+    ]
+    stops = [
+        {"train_number": "T1", "station_code": "STN_A", "stop_sequence": 0, "planned_departure_min": 100, "revised_departure_min": 100},
+        {"train_number": "T1", "station_code": "STN_B", "stop_sequence": 1, "planned_arrival_min": 120, "revised_arrival_min": 120},
+        {"train_number": "T2", "station_code": "STN_A", "stop_sequence": 0, "planned_departure_min": 105, "revised_departure_min": 105},
+        {"train_number": "T2", "station_code": "STN_B", "stop_sequence": 1, "planned_arrival_min": 125, "revised_arrival_min": 125},
+    ]
+    sections = [{
+        "from_station_code": "STN_A",
+        "to_station_code": "STN_B",
+        "running_time_min": 20,
+        "is_double_track": False,
+        "headway_min": 5,
+    }]
+    blocks = [
+        {"code": "BLK-AB-0", "section_from": "STN_A", "section_to": "STN_B", "block_index": 0, "time_fraction": 1.0},
+    ]
+    stations = [
+        {"code": "STN_A", "name": "Station A", "platform_count": 2, "has_passing_loop": True},
+        {"code": "STN_B", "name": "Station B", "platform_count": 2, "has_passing_loop": True},
+    ]
+
+    res = verify_schedule_integrity(trains, stops, sections, blocks, stations)
+    assert not res.is_valid, "Overlapping single-track occupancy must fail verification"
+    assert res.violation_count >= 1
+    assert any(v.violation_type == ViolationType.RESERVATION_OVERLAP for v in res.violations)
+    assert "block_reservation_overlap" in res.checks_failed
+
+
+def test_verifier_detects_and_rejects_opposing_movements():
+    """Independent verifier must detect and reject opposing train movements on single-track corridor."""
+    trains = [
+        {"train_number": "T_DOWN", "direction": "down", "priority": 1},
+        {"train_number": "T_UP", "direction": "up", "priority": 2},
+    ]
+    stops = [
+        {"train_number": "T_DOWN", "station_code": "STN_A", "stop_sequence": 0, "planned_departure_min": 200, "revised_departure_min": 200},
+        {"train_number": "T_DOWN", "station_code": "STN_B", "stop_sequence": 1, "planned_arrival_min": 230, "revised_arrival_min": 230},
+        {"train_number": "T_UP", "station_code": "STN_B", "stop_sequence": 0, "planned_departure_min": 210, "revised_departure_min": 210},
+        {"train_number": "T_UP", "station_code": "STN_A", "stop_sequence": 1, "planned_arrival_min": 240, "revised_arrival_min": 240},
+    ]
+    sections = [{
+        "from_station_code": "STN_A",
+        "to_station_code": "STN_B",
+        "running_time_min": 30,
+        "is_double_track": False,
+        "headway_min": 5,
+    }]
+    blocks = [
+        {"code": "BLK-AB-0", "section_from": "STN_A", "section_to": "STN_B", "block_index": 0, "time_fraction": 0.5},
+        {"code": "BLK-AB-1", "section_from": "STN_A", "section_to": "STN_B", "block_index": 1, "time_fraction": 0.5},
+    ]
+    stations = [
+        {"code": "STN_A", "name": "Station A", "platform_count": 2, "has_passing_loop": True},
+        {"code": "STN_B", "name": "Station B", "platform_count": 2, "has_passing_loop": True},
+    ]
+
+    res = verify_schedule_integrity(trains, stops, sections, blocks, stations)
+    assert not res.is_valid, "Opposing trains in same single-track section must fail verification"
+    assert any(v.violation_type == ViolationType.OPPOSING_MOVEMENT for v in res.violations)
+    assert "opposing_movement" in res.checks_failed
+
+
+def test_verifier_detects_and_rejects_headway_violations():
+    """Independent verifier must detect and reject headway violations between consecutive trains."""
+    trains = [
+        {"train_number": "T1", "direction": "down", "priority": 1},
+        {"train_number": "T2", "direction": "down", "priority": 1},
+    ]
+    stops = [
+        {"train_number": "T1", "station_code": "STN_A", "stop_sequence": 0, "planned_departure_min": 300, "revised_departure_min": 300},
+        {"train_number": "T1", "station_code": "STN_B", "stop_sequence": 1, "planned_arrival_min": 320, "revised_arrival_min": 320},
+        {"train_number": "T2", "station_code": "STN_A", "stop_sequence": 0, "planned_departure_min": 302, "revised_departure_min": 302},
+        {"train_number": "T2", "station_code": "STN_B", "stop_sequence": 1, "planned_arrival_min": 322, "revised_arrival_min": 322},
+    ]
+    sections = [{
+        "from_station_code": "STN_A",
+        "to_station_code": "STN_B",
+        "running_time_min": 20,
+        "is_double_track": True,
+        "headway_min": 6,
+    }]
+    blocks = [
+        {"code": "BLK-AB-0", "section_from": "STN_A", "section_to": "STN_B", "block_index": 0, "time_fraction": 1.0},
+    ]
+    stations = [
+        {"code": "STN_A", "name": "Station A", "platform_count": 2, "has_passing_loop": True},
+        {"code": "STN_B", "name": "Station B", "platform_count": 2, "has_passing_loop": True},
+    ]
+
+    res = verify_schedule_integrity(trains, stops, sections, blocks, stations)
+    assert not res.is_valid, "Headway gap 2 min < required 6 min must fail verification"
+    assert any(v.violation_type == ViolationType.HEADWAY_VIOLATION for v in res.violations)
+    assert "headway_separation" in res.checks_failed
+
+
+def test_infeasible_schedule_never_claimed_valid(mem_db: Session):
+    """Never claim an infeasible schedule is valid: conflicting trains with max_delay=0 must return INFEASIBLE."""
+    s1 = Station(code="STN_X", name="Station X", lat=1.0, lon=1.0, platform_count=1)
+    s2 = Station(code="STN_Y", name="Station Y", lat=2.0, lon=2.0, platform_count=1)
+    mem_db.add_all([s1, s2])
+    mem_db.flush()
+
+    sec = TrackSection(from_station_id=s1.id, to_station_id=s2.id, running_time_min=30, is_double_track=False)
+    mem_db.add(sec)
+    mem_db.flush()
+
+    blk = Block(code="BLK-XY-0", section_id=sec.id, block_index=0, time_fraction=1.0, state="available")
+    mem_db.add(blk)
+    mem_db.flush()
+
+    # Two trains simultaneously departing opposite ends of single track at minute 100
+    t1 = Train(train_number="TX1", name="Train X1", direction="down", priority=1, is_active=True)
+    t2 = Train(train_number="TY1", name="Train Y1", direction="up", priority=1, is_active=True)
+    mem_db.add_all([t1, t2])
+    mem_db.flush()
+
+    mem_db.add_all([
+        StopTime(train_id=t1.id, station_id=s1.id, stop_sequence=0, planned_departure_min=100),
+        StopTime(train_id=t1.id, station_id=s2.id, stop_sequence=1, planned_arrival_min=130),
+        StopTime(train_id=t2.id, station_id=s2.id, stop_sequence=0, planned_departure_min=100),
+        StopTime(train_id=t2.id, station_id=s1.id, stop_sequence=1, planned_arrival_min=130),
+    ])
+    mem_db.commit()
+
+    # With max_delay_min = 0, no delay is permitted so resolution is impossible
+    res = optimize_schedule(mem_db, {"max_delay_min": 0, "time_limit_s": 3.0})
+    assert res["solver_status"] == "INFEASIBLE"
+    assert res.get("verified") is not True
+    assert res["revised_schedule"] == []
+
