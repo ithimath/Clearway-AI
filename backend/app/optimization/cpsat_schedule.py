@@ -76,9 +76,18 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
         }
         for s in sections_raw
     ]
-    section_rt = {(s["from_station_code"], s["to_station_code"]): s["running_time_min"] for s in section_dicts}
-    section_hw = {(s["from_station_code"], s["to_station_code"]): s["headway_min"] for s in section_dicts}
-    section_dt = {(s["from_station_code"], s["to_station_code"]): s["is_double_track"] for s in section_dicts}
+    section_rt: dict[tuple[str, str], int] = {}
+    section_hw: dict[tuple[str, str], int] = {}
+    section_dt: dict[tuple[str, str], bool] = {}
+    for s in section_dicts:
+        f = s["from_station_code"]
+        t = s["to_station_code"]
+        section_rt[(f, t)] = s["running_time_min"]
+        section_rt[(t, f)] = s["running_time_min"]
+        section_hw[(f, t)] = s["headway_min"]
+        section_hw[(t, f)] = s["headway_min"]
+        section_dt[(f, t)] = s["is_double_track"]
+        section_dt[(t, f)] = s["is_double_track"]
 
     block_dicts = []
     for b in blocks_raw:
@@ -172,7 +181,7 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
                 maintenance_windows.append((b_code, s_min, e_min))
 
     baseline_conflicts = detect_all(trains_dicts, stop_dicts, section_dicts, block_dicts,
-                                    closed_blocks=closed_blocks, use_revised=False)
+                                    closed_blocks=maintenance_windows, use_revised=False)
 
     # --- BUILD INTERVAL CP-SAT MODEL ---
     model = cp_model.CpModel()
@@ -193,6 +202,8 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
     station_dwell_intervals: dict[str, list[cp_model.IntervalVar]] = {}
     # Track single-track section traversals for opposing movement deadlock prevention
     section_traversals: dict[tuple[str, str], list[dict[str, Any]]] = {}
+
+    objective_terms: list[cp_model.LinearExpr] = []
 
     for t in trains_raw:
         tn = t.train_number
@@ -422,6 +433,10 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
             }
             for s in db.query(StopTime).all()
         ]
+
+        post_conflicts = detect_all(trains_dicts, revised_stop_dicts, section_dicts, block_dicts,
+                                    closed_blocks=maintenance_windows, use_revised=True)
+
         # Run independent verification engine (plain Python, no OR-Tools)
         from app.domain.verifier import verify_schedule_integrity
         station_dicts = [
@@ -441,17 +456,22 @@ def _optimize_schedule_interval(db: Session, weights: dict[str, float]) -> dict[
             closed_windows=maint_window_dicts,
         )
 
+        base_explanation = _build_explanation(
+            status_str, len(trains_raw), len(baseline_conflicts),
+            len(post_conflicts), float(total_assigned_delay), solve_time, weights
+        )
+
         final_status = status_str
         if not ver_res.is_valid:
             final_status = "VERIFICATION_FAILED"
             explanation = (
                 f"[INDEPENDENT VERIFICATION FAILED: {ver_res.violation_count} safety violations detected] "
-                + explanation
+                + base_explanation
             )
         else:
             explanation = (
                 f"[INDEPENDENT VERIFICATION PASSED: 0 safety violations across {len(ver_res.checks_passed)} checks] "
-                + explanation
+                + base_explanation
             )
 
         return {

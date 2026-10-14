@@ -347,33 +347,53 @@ def detect_opposing_movements(
 
 def detect_closure_conflicts(
     occupancy: dict[str, list[dict]],
-    closed_blocks: set[str],
+    closed_blocks: set[str] | list[dict] | list[tuple] | list[str] | None = None,
     context: str = "baseline",
 ) -> list[ConflictResult]:
-    """Rule 4: Train scheduled into a closed (maintenance) block."""
+    """Rule 4: Train scheduled into a closed (maintenance) block during active closure."""
     conflicts: list[ConflictResult] = []
-    for block_code in closed_blocks:
-        for w in occupancy.get(block_code, []):
-            conflicts.append(ConflictResult.make(
-                conflict_type=ConflictType.CLOSURE_CONFLICT,
-                severity=Severity.CRITICAL,
-                trains=[w["train_number"]],
-                resource_code=block_code,
-                interval_start_min=w["entry_min"],
-                interval_end_min=w["exit_min"],
-                explanation=(
-                    f"Train {w['train_number']} is scheduled through block "
-                    f"{block_code} which is closed for maintenance "
-                    f"({w['entry_min']}–{w['exit_min']} min)."
-                ),
-                rule_source="ASSUMED",
-                suggested_actions=[
-                    "Reroute via alternate path or passing loop.",
-                    "Cancel/hold train until block reopens.",
-                    "Adjust maintenance window.",
-                ],
-                context=context,
+    if not closed_blocks:
+        return conflicts
+
+    windows: list[tuple[str, int, int]] = []
+    for item in closed_blocks:
+        if isinstance(item, dict) and "block_code" in item:
+            windows.append((
+                str(item["block_code"]),
+                int(item.get("start_min", 0)),
+                int(item.get("end_min", 1440)),
             ))
+        elif isinstance(item, tuple) and len(item) == 3:
+            windows.append((str(item[0]), int(item[1]), int(item[2])))
+        elif isinstance(item, str):
+            windows.append((item, 0, 1440))
+
+    for block_code, s_min, e_min in windows:
+        # Match single track block code or double track directional codes
+        matching_keys = [k for k in occupancy if k == block_code or k.startswith(f"{block_code}-")]
+        for k in matching_keys:
+            for w in occupancy.get(k, []):
+                if _intervals_overlap(w["entry_min"], w["exit_min"], s_min, e_min):
+                    conflicts.append(ConflictResult.make(
+                        conflict_type=ConflictType.CLOSURE_CONFLICT,
+                        severity=Severity.CRITICAL,
+                        trains=[w["train_number"]],
+                        resource_code=block_code,
+                        interval_start_min=max(w["entry_min"], s_min),
+                        interval_end_min=min(w["exit_min"], e_min),
+                        explanation=(
+                            f"Train {w['train_number']} is scheduled through block "
+                            f"{block_code} which is closed for maintenance "
+                            f"({s_min}–{e_min} min; train occupancy: {w['entry_min']}–{w['exit_min']} min)."
+                        ),
+                        rule_source="ASSUMED",
+                        suggested_actions=[
+                            "Reroute via alternate path or passing loop.",
+                            "Cancel/hold train until block reopens.",
+                            "Adjust maintenance window.",
+                        ],
+                        context=context,
+                    ))
     return conflicts
 
 
